@@ -4,16 +4,24 @@ import { homedir } from "os";
 import { join } from "path";
 import { evaluate } from "./matcher.js";
 import { audit } from "./audit.js";
-import type { Config, HookInput } from "./types.js";
+import type { Config, HookInput, MatchResult } from "./types.js";
 
 function readStdin(): string {
   return readFileSync("/dev/stdin", "utf-8");
 }
 
-function resolveConfigPath(): string {
+function resolveRootConfigPath(): string {
   const arg = process.argv[2];
   if (arg) return arg;
   return join(homedir(), ".claude", "permissions.json");
+}
+
+function loadConfig(path: string): Config | null {
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as Config;
+  } catch {
+    return null;
+  }
 }
 
 function main(): void {
@@ -24,19 +32,35 @@ function main(): void {
     process.exit(0); // unparseable input → passthrough
   }
 
-  let config: Config;
-  try {
-    const raw = readFileSync(resolveConfigPath(), "utf-8");
-    config = JSON.parse(raw) as Config;
-  } catch {
-    process.exit(0); // missing config → passthrough
+  const rootConfig = loadConfig(resolveRootConfigPath());
+  const projectConfig = input.cwd
+    ? loadConfig(join(input.cwd, ".claude", "permissions.json"))
+    : null;
+
+  if (!projectConfig && !rootConfig) {
+    process.exit(0); // no config anywhere → passthrough
   }
 
-  const result = evaluate(input, config.allow ?? []);
+  // Cascade: project first, root only if project didn't allow
+  let projectResult: MatchResult = { decision: null, rule: null };
+  let rootResult: MatchResult = { decision: null, rule: null };
 
-  audit(config.audit, input, result);
+  if (projectConfig) {
+    projectResult = evaluate(input, projectConfig.allow ?? []);
+  }
+  if (projectResult.decision !== "allow" && rootConfig) {
+    rootResult = evaluate(input, rootConfig.allow ?? []);
+  }
 
-  if (result.decision === "allow") {
+  // Audit each config independently; root only audited when actually consulted
+  if (projectConfig) {
+    audit(projectConfig.audit, input, projectResult);
+  }
+  if (rootConfig && projectResult.decision !== "allow") {
+    audit(rootConfig.audit, input, rootResult);
+  }
+
+  if (projectResult.decision === "allow" || rootResult.decision === "allow") {
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -46,7 +70,7 @@ function main(): void {
       })
     );
   }
-  // null → no output → Claude Code shows normal permission dialog
+  // no output → passthrough to Claude Code permission dialog
 }
 
 main();
