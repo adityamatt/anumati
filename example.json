@@ -1,0 +1,16 @@
+{
+  "audit": {
+    "audit_file": "/tmp/anumati.json",
+    "audit_level": "matched"
+  },
+  "allow": [
+    {
+      "tool": "Bash",
+      "matcher": "curl",
+      "allowed_domains": ["raw.githubusercontent.com", "api.github.com"],
+      "desc": "GitHub reads"
+    },
+    { "tool": "Bash", "matcher": "npx-tsc", "desc": "TypeScript type checking" },
+    { "tool": "Read", "matcher": "safe-read", "desc": "File reads (no path traversal)" }
+  ]
+}
