@@ -10,7 +10,7 @@
     "build": "tsc",
     "prepare": "npm run build",
     "dev": "ts-node src/index.ts",
-    "try": "ts-node scripts/try.ts",
+    "try": "npm run build -s && node scripts/try.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
