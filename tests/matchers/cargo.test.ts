@@ -1,0 +1,62 @@
+import { describe, it, expect } from "vitest";
+import { matchCargo } from "../../src/matchers/cargo.js";
+
+describe("matchCargo — allowed", () => {
+  it("cargo check", () => expect(matchCargo("cargo check")).toBe(true));
+  it("cargo build", () => expect(matchCargo("cargo build")).toBe(true));
+  it("cargo build --release", () => expect(matchCargo("cargo build --release")).toBe(true));
+  it("cargo b alias", () => expect(matchCargo("cargo b")).toBe(true));
+  it("cargo test", () => expect(matchCargo("cargo test")).toBe(true));
+  it("cargo t alias", () => expect(matchCargo("cargo t")).toBe(true));
+  it("cargo test with -- --ignored", () => expect(matchCargo("cargo test -- --ignored")).toBe(true));
+  it("cargo clippy", () => expect(matchCargo("cargo clippy")).toBe(true));
+  it("cargo clippy -- -D warnings", () => expect(matchCargo("cargo clippy -- -D warnings")).toBe(true));
+  it("cargo fmt --check", () => expect(matchCargo("cargo fmt --check")).toBe(true));
+  it("cargo fmt -- --check", () => expect(matchCargo("cargo fmt -- --check")).toBe(true));
+  it("cargo tree", () => expect(matchCargo("cargo tree")).toBe(true));
+  it("cargo metadata --format-version 1", () => expect(matchCargo("cargo metadata --format-version 1")).toBe(true));
+  it("cargo doc", () => expect(matchCargo("cargo doc")).toBe(true));
+  it("cargo bench", () => expect(matchCargo("cargo bench")).toBe(true));
+  it("cargo version", () => expect(matchCargo("cargo version")).toBe(true));
+  it("cargo --version", () => expect(matchCargo("cargo --version")).toBe(true));
+  it("cargo search serde", () => expect(matchCargo("cargo search serde")).toBe(true));
+  it("cargo verify-project", () => expect(matchCargo("cargo verify-project")).toBe(true));
+  it("cargo locate-project", () => expect(matchCargo("cargo locate-project")).toBe(true));
+  it("cargo pkgid", () => expect(matchCargo("cargo pkgid")).toBe(true));
+  it("cd dir && cargo check", () => expect(matchCargo("cd ./mycrate && cargo check")).toBe(true));
+  it("cargo tree | grep serde", () => expect(matchCargo("cargo tree | grep serde")).toBe(true));
+  it("cargo tree | head", () => expect(matchCargo("cargo tree | head")).toBe(true));
+  it("cargo tree | grep serde | head -n 5", () => expect(matchCargo("cargo tree | grep serde | head -n 5")).toBe(true));
+  it("cd dir && cargo build | grep warning", () =>
+    expect(matchCargo("cd ./mycrate && cargo build | grep warning")).toBe(true));
+});
+
+describe("matchCargo — blocked", () => {
+  it("cargo run", () => expect(matchCargo("cargo run")).toBe(false));
+  it("cargo r alias", () => expect(matchCargo("cargo r")).toBe(false));
+  it("cargo install ripgrep", () => expect(matchCargo("cargo install ripgrep")).toBe(false));
+  it("cargo fmt (bare, rewrites)", () => expect(matchCargo("cargo fmt")).toBe(false));
+  it("cargo clean", () => expect(matchCargo("cargo clean")).toBe(false));
+  it("cargo update", () => expect(matchCargo("cargo update")).toBe(false));
+  it("cargo publish", () => expect(matchCargo("cargo publish")).toBe(false));
+  it("cargo add serde", () => expect(matchCargo("cargo add serde")).toBe(false));
+  it("cargo remove serde", () => expect(matchCargo("cargo remove serde")).toBe(false));
+  it("cargo fix", () => expect(matchCargo("cargo fix")).toBe(false));
+  it("cargo new foo", () => expect(matchCargo("cargo new foo")).toBe(false));
+  it("cargo init", () => expect(matchCargo("cargo init")).toBe(false));
+  it("cargo doc --open launches browser", () => expect(matchCargo("cargo doc --open")).toBe(false));
+  it("unknown external subcommand", () => expect(matchCargo("cargo whatever")).toBe(false));
+  it("cargo with no subcommand", () => expect(matchCargo("cargo")).toBe(false));
+  it("&& dangerous command", () => expect(matchCargo("cargo build && rm -rf /")).toBe(false));
+  it("redirection >", () => expect(matchCargo("cargo build > out")).toBe(false));
+  it("redirection 2>&1", () => expect(matchCargo("cargo build 2>&1 | head")).toBe(false));
+  it("semicolon chain", () => expect(matchCargo("cargo build; rm x")).toBe(false));
+  it("|| operator", () => expect(matchCargo("cargo build || echo fail")).toBe(false));
+  it("background &", () => expect(matchCargo("cargo build &")).toBe(false));
+  it("subshell expansion", () => expect(matchCargo("cargo $(echo build)")).toBe(false));
+  it("pipe to unsafe builtin", () => expect(matchCargo("cargo tree | sh")).toBe(false));
+  it("pipe to xargs", () => expect(matchCargo("cargo tree | xargs rm")).toBe(false));
+  it("not cargo", () => expect(matchCargo("npm run build")).toBe(false));
+  it("cd then non-cargo", () => expect(matchCargo("cd /a && npm test")).toBe(false));
+  it("cd with extra args", () => expect(matchCargo("cd /a /b && cargo check")).toBe(false));
+});
