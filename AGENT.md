@@ -86,6 +86,11 @@ Default: `~/.claude/permissions.json`. Pass alternate path as first arg.
 | `sudo` | Bash | deny any sudo invocation | — |
 | `git-push-force` | Bash | deny git push --force / -f | — |
 | `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant) | — |
+| `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
+| `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/branch-list/config --get/…), pipe to safe builtins | — |
+| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` for allowlisted scripts + read-only queries (ls/view/outdated) | `allowed_scripts` |
+| `cargo` | Bash | allow cargo check/build/test/clippy/fmt --check/tree/… (+ cd && variant, pipe to builtins) | — |
+| `go` | Bash | allow go build/test/vet/fmt/list/doc/env(read)/mod(read) (+ cd && variant, pipe to builtins) | — |
 | `safe-read` | Read | allow file reads without .. traversal | — |
 
 ## Adding a new named matcher

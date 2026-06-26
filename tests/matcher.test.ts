@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { evaluate } from "../src/matcher.js";
 import type { HookInput, Rule } from "../src/types.js";
 
@@ -209,34 +212,46 @@ describe("evaluate — python3-pipe with open.allowed_paths", () => {
 });
 
 describe("evaluate — python3-pipe script file", () => {
-  const rule: Rule = {
+  let scriptDir: string;
+
+  const ruleFor = (allowedPaths: string[]): Rule => ({
     tool: "Bash", matcher: "python3-pipe",
     allowed_imports: ["json"],
-    open: { allowed_paths: ["/Users/aditya/source/insta-analyzer/"] },
-  };
+    open: { allowed_paths: allowedPaths },
+  });
+
+  beforeAll(() => {
+    scriptDir = mkdtempSync(join(tmpdir(), "anumati-py-"));
+    writeFileSync(join(scriptDir, "safe_script.py"), "import json\nprint(json.dumps({'ok': True}))\n");
+    writeFileSync(join(scriptDir, "unsafe_script.py"), "import os\nos.system('echo pwned')\n");
+  });
+
+  afterAll(() => {
+    rmSync(scriptDir, { recursive: true, force: true });
+  });
 
   function bashWithCwd(command: string, cwd: string): HookInput {
     return { session_id: "test", tool_name: "Bash", tool_input: { command }, cwd };
   }
 
   it("allows script with safe imports and allowed open path", () => {
-    const input = bashWithCwd("python3 safe_script.py", "/tmp");
-    expect(evaluate(input, [rule]).decision).toBe("allow");
+    const input = bashWithCwd("python3 safe_script.py", scriptDir);
+    expect(evaluate(input, [ruleFor([scriptDir])]).decision).toBe("allow");
   });
 
   it("returns null for script with dangerous import", () => {
-    const input = bashWithCwd("python3 unsafe_script.py", "/tmp");
-    expect(evaluate(input, [rule]).decision).toBeNull();
+    const input = bashWithCwd("python3 unsafe_script.py", scriptDir);
+    expect(evaluate(input, [ruleFor([scriptDir])]).decision).toBeNull();
   });
 
   it("returns null when script file does not exist", () => {
-    const input = bashWithCwd("python3 nonexistent.py", "/tmp");
-    expect(evaluate(input, [rule]).decision).toBeNull();
+    const input = bashWithCwd("python3 nonexistent.py", scriptDir);
+    expect(evaluate(input, [ruleFor([scriptDir])]).decision).toBeNull();
   });
 
   it("returns null for python3 with flags beyond script", () => {
-    const input = bashWithCwd("python3 -v script.py", "/tmp");
-    expect(evaluate(input, [rule]).decision).toBeNull();
+    const input = bashWithCwd("python3 -v script.py", scriptDir);
+    expect(evaluate(input, [ruleFor([scriptDir])]).decision).toBeNull();
   });
 });
 
