@@ -1,10 +1,26 @@
 #!/usr/bin/env node
 import { readFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
 import { evaluate } from "./matcher.js";
 import { audit } from "./audit.js";
-import type { Config, HookInput, MatchResult } from "./types.js";
+import {
+  defaultConfigPath,
+  projectConfigPath,
+  loadConfig,
+} from "./config.js";
+import { suggest } from "./suggest.js";
+import {
+  storeSuggestion,
+  defaultSuggestionsFile,
+} from "./suggest-store.js";
+import { runAdd } from "./cli/add.js";
+import { runApply } from "./cli/apply.js";
+import type {
+  Config,
+  HookInput,
+  MatchResult,
+  Rule,
+  SuggestConfig,
+} from "./types.js";
 
 function readStdin(): string {
   return readFileSync("/dev/stdin", "utf-8");
@@ -13,18 +29,24 @@ function readStdin(): string {
 function resolveRootConfigPath(): string {
   const arg = process.argv[2];
   if (arg) return arg;
-  return join(homedir(), ".claude", "permissions.json");
+  return defaultConfigPath();
 }
 
-function loadConfig(path: string): Config | null {
-  try {
-    return JSON.parse(readFileSync(path, "utf-8")) as Config;
-  } catch {
-    return null;
-  }
+// Merge suggest config across configs; project overrides root field-by-field.
+function resolveSuggestConfig(
+  projectConfig: Config | null,
+  rootConfig: Config | null,
+): Required<SuggestConfig> {
+  const root = rootConfig?.suggest ?? {};
+  const project = projectConfig?.suggest ?? {};
+  return {
+    enabled: project.enabled ?? root.enabled ?? true,
+    stderr: project.stderr ?? root.stderr ?? true,
+    file: project.file ?? root.file ?? defaultSuggestionsFile(),
+  };
 }
 
-function main(): void {
+function runHook(): void {
   let input: HookInput;
   try {
     input = JSON.parse(readStdin()) as HookInput;
@@ -34,7 +56,7 @@ function main(): void {
 
   const rootConfig = loadConfig(resolveRootConfigPath());
   const projectConfig = input.cwd
-    ? loadConfig(join(input.cwd, ".claude", "permissions.json"))
+    ? loadConfig(projectConfigPath(input.cwd))
     : null;
 
   if (!projectConfig && !rootConfig) {
@@ -69,8 +91,46 @@ function main(): void {
         },
       })
     );
+    return;
   }
-  // no output → passthrough to Claude Code permission dialog
+
+  // Passthrough — try to suggest a config change that would auto-approve this.
+  const sc = resolveSuggestConfig(projectConfig, rootConfig);
+  if (!sc.enabled) return;
+
+  const allRules: Rule[] = [
+    ...(projectConfig?.allow ?? []),
+    ...(rootConfig?.allow ?? []),
+  ];
+
+  const suggestion = suggest(input, allRules);
+  if (!suggestion) return;
+
+  if (sc.stderr) {
+    const riskNote =
+      suggestion.risk !== "low"
+        ? `\n   ⚠️  ${suggestion.risk} risk: ${suggestion.riskReason ?? ""}`
+        : "";
+    process.stderr.write(
+      `💡 anumati: ${suggestion.description}\n` +
+        `   Run: ${suggestion.command}${riskNote}\n`
+    );
+  }
+  storeSuggestion(suggestion, sc.file);
+}
+
+function main(): void {
+  const subcommand = process.argv[2];
+  if (subcommand === "add") {
+    runAdd(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "apply") {
+    runApply(process.argv.slice(2));
+    return;
+  }
+  // Otherwise act as a PreToolUse hook (argv[2], if present, is a config path).
+  runHook();
 }
 
 main();

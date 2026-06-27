@@ -6,7 +6,7 @@ const DANGEROUS_BUILTINS = [
 ];
 
 // Modules that are always blocked regardless of allowed_imports
-const ALWAYS_BLOCKED = new Set([
+export const ALWAYS_BLOCKED = new Set([
   "os", "os.path", "subprocess", "socket", "requests",
   "urllib.request", "urllib.error", "http.client", "httplib",
   "ftplib", "smtplib", "imaplib", "poplib", "telnetlib",
@@ -17,7 +17,7 @@ const ALWAYS_BLOCKED = new Set([
   "pkgutil", "pkg_resources", "setuptools", "distutils",
 ]);
 
-function extractImports(code: string): string[] {
+export function extractImports(code: string): string[] {
   const imports: string[] = [];
   const re = /\bimport\s+([\w.]+)|\bfrom\s+([\w.]+)\s+import/g;
   let m: RegExpExecArray | null;
@@ -28,7 +28,7 @@ function extractImports(code: string): string[] {
 }
 
 // Returns extracted literal paths, or null if any open() call uses a dynamic arg
-function extractOpenPaths(code: string): string[] | null {
+export function extractOpenPaths(code: string): string[] | null {
   const paths: string[] = [];
   let i = 0;
   while (i < code.length) {
