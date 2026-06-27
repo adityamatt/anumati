@@ -20,8 +20,18 @@ export interface AuditConfig {
   audit_level?: "off" | "matched" | "all";
 }
 
+export interface SuggestConfig {
+  /** Generate config suggestions on passthrough. Default: true. */
+  enabled?: boolean;
+  /** Where accumulated suggestions are appended. Default: ~/.claude/anumati-suggestions.jsonl */
+  file?: string;
+  /** Print the suggestion to stderr alongside the permission prompt. Default: true. */
+  stderr?: boolean;
+}
+
 export interface Config {
   audit?: AuditConfig;
+  suggest?: SuggestConfig;
   allow?: Rule[];
 }
 
