@@ -1,6 +1,6 @@
 {
   "name": "anumati",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PreToolUse hook for Claude Code — config-driven allow rules that reduce permission prompts and suggest new rules from real usage",
   "main": "dist/index.js",
   "bin": {
