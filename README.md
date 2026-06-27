@@ -6,12 +6,14 @@ A `PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows 
 
 ## How it works
 
-Every time Claude Code is about to run a tool (Bash, Read, …), this hook intercepts the request and checks it against your allow rules:
+Every time Claude Code is about to run a tool (Bash, Read, …), this hook intercepts the request and checks it against your allow rules. anumati is **allow-only**: it can auto-approve a call or stay out of the way, but it never blocks anything itself.
 
-1. **Allow rules** are evaluated in order — the first matching rule auto-approves the call.
-2. **No match** — Claude Code shows the normal permission dialog, and anumati prints a 💡 suggestion to stderr showing how to allow it next time.
+1. **A rule matches** → the call is auto-approved, with no prompt.
+2. **No rule matches** → Claude Code shows its normal permission dialog, and anumati prints a 💡 suggestion to stderr showing how to allow it next time.
 
-Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`.
+Because every rule can only ever *allow*, rule order doesn't affect the decision — if any rule matches, the call is approved. (Internally the first match wins and short-circuits, which is what gets recorded in the audit log.)
+
+Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`. A call is approved if a rule in *either* matches.
 
 ## Install
 
