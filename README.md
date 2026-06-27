@@ -15,6 +15,12 @@ Because every rule can only ever *allow*, rule order doesn't affect the decision
 
 Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`. A call is approved if a rule in *either* matches.
 
+### One rule must cover the whole command
+
+A command is approved only if a **single** rule's matcher accepts it in full — including every `&&`, `|`, and `;` segment. anumati never stitches multiple rules together to cover different parts of one command, so you can't slip a disallowed command past the gate by chaining it onto an allowed one. For example, with `cargo` and `curl` rules configured, `cargo build && curl https://evil.com` is **not** approved: the `cargo` rule rejects the `curl` segment, the `curl` rule rejects the `cargo` segment, and the call falls through to the permission dialog.
+
+Matchers do understand compound commands within their own safe vocabulary. The `curl` matcher, for instance, allows piping into read-only builtins (`curl https://api.github.com/repos | jq .`), and `cargo`/`go` allow a leading `cd <dir> &&`. But that awareness is scoped to the one matcher — it is never a license to mix segments belonging to different rules.
+
 ## Install
 
 ```bash
