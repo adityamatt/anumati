@@ -157,6 +157,15 @@ anumati apply --all      # apply all of them, then clear
 anumati apply --clear    # discard without applying
 ```
 
+### `anumati --help` / `--version`
+
+```bash
+anumati --help     # usage for all subcommands (also -h)
+anumati --version  # installed version (also -V)
+```
+
+Running `anumati` with no arguments in a terminal prints the same help. When invoked as a hook, Claude Code pipes a JSON request on stdin, so the hook path runs instead.
+
 ### Suggestion config
 
 Tune behavior with an optional `suggest` block (all fields optional):
