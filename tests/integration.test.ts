@@ -111,3 +111,46 @@ describe("cli — apply", () => {
     expect(res.stdout).toContain("No pending suggestions.");
   });
 });
+
+describe("cli — help & version", () => {
+  const pkgVersion = JSON.parse(
+    readFileSync(join(ROOT, "package.json"), "utf-8"),
+  ).version as string;
+
+  it("--help prints usage and exits 0", () => {
+    const res = run(["--help"]);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("Usage:");
+    expect(res.stdout).toContain("anumati add <matcher>");
+  });
+
+  it("-h is an alias for --help", () => {
+    const res = run(["-h"]);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("Usage:");
+  });
+
+  it("--version prints the package version", () => {
+    const res = run(["--version"]);
+    expect(res.status).toBe(0);
+    expect(res.stdout.trim()).toBe(pkgVersion);
+  });
+
+  it("-V is an alias for --version", () => {
+    const res = run(["-V"]);
+    expect(res.stdout.trim()).toBe(pkgVersion);
+  });
+
+  it("does not show help when invoked as a hook (piped JSON still works)", () => {
+    // A real hook call pipes JSON on a non-TTY stdin — must NOT print help.
+    writeFileSync(configPath, JSON.stringify({ allow: [{ tool: "Bash", matcher: "cargo" }] }));
+    const res = run([configPath], {
+      session_id: "s",
+      tool_name: "Bash",
+      tool_input: { command: "cargo build" },
+      cwd: dir,
+    });
+    expect(res.stdout).toContain('"permissionDecision":"allow"');
+    expect(res.stdout).not.toContain("Usage:");
+  });
+});
