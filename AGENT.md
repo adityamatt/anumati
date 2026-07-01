@@ -44,9 +44,14 @@ interface Rule {
 interface Config {
   allow?: Rule[];                  // allow-only; first match wins. No deny list.
   audit?: { audit_file?: string; audit_level?: "off" | "matched" | "all" };
-  suggest?: { enabled?: boolean; stderr?: boolean; file?: string };
+  suggest?: { enabled?: boolean; show?: boolean; file?: string; debug?: boolean };
+  //          show: surface 💡/🔍 to user (stderr = deprecated alias). debug: explain passthroughs.
 }
 ```
+
+## Surfacing messages to the user
+
+PreToolUse hook **stderr is invisible in the UI on exit 0** (debug-log only). To show 💡 suggestions and 🔍 debug notes, the hook writes `{"systemMessage": "…"}` to **stdout** and omits `permissionDecision` — Claude Code displays the message while the call stays on its normal passthrough path. See `emitMessage()` in `src/index.ts`. An allow still emits `hookSpecificOutput.permissionDecision = "allow"` as before.
 
 ## Shell parser invariants
 

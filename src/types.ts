@@ -25,8 +25,18 @@ export interface SuggestConfig {
   enabled?: boolean;
   /** Where accumulated suggestions are appended. Default: ~/.claude/anumati-suggestions.jsonl */
   file?: string;
-  /** Print the suggestion to stderr alongside the permission prompt. Default: true. */
-  stderr?: boolean;
+  /**
+   * Surface suggestions/debug notes to the user (via the hook's `systemMessage`,
+   * shown alongside the permission prompt). Default: true.
+   */
+  show?: boolean;
+  /**
+   * Debug mode: when a command falls through and no suggestion fires, surface a
+   * 🔍 note explaining WHY it was not auto-approved (e.g. a `;` separator, a
+   * redirection, an uncovered command). Useful while expanding your ruleset.
+   * Default: false.
+   */
+  debug?: boolean;
 }
 
 export interface Config {
