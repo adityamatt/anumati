@@ -7,6 +7,7 @@ import {
   extractImports,
   extractOpenPaths,
   ALWAYS_BLOCKED,
+  KNOWN_SAFE_IMPORTS,
 } from "./classifiers/python3.js";
 import { matchCurl } from "./matchers/curl.js";
 import { matchPython3Pipe } from "./matchers/python3-pipe.js";
@@ -36,6 +37,9 @@ export interface Suggestion {
   /** The original command/input that triggered this */
   trigger: string;
 }
+
+// Fast lookup for risk classification of python3 import suggestions.
+const KNOWN_SAFE_SET = new Set(KNOWN_SAFE_IMPORTS);
 
 /**
  * Generate a config-change suggestion for an input that fell through to the
@@ -371,13 +375,19 @@ function python3Suggestion(
   if (paths.length > 0) parts.push(`file access to ${paths.join(", ")}`);
   const what = parts.length > 0 ? ` (${parts.join("; ")})` : "";
 
+  // Low-risk only when every new import is a vetted pure-stdlib module AND the
+  // script needs no file access — otherwise python3 can touch local files.
+  const allImportsKnownSafe =
+    imports.length > 0 && imports.every((i) => KNOWN_SAFE_SET.has(i));
+  const lowRisk = paths.length === 0 && allImportsKnownSafe;
+
   return {
     command: `anumati add python3-pipe${flags.length ? " " + flags.join(" ") : ""}`,
     description: `Auto-approve python3${what}`,
     matcher: "python3-pipe",
     configDelta,
-    risk: "medium",
-    riskReason: "python3 can read and write local files",
+    risk: lowRisk ? "low" : "medium",
+    riskReason: lowRisk ? undefined : "python3 can read and write local files",
     trigger: cmd,
   };
 }

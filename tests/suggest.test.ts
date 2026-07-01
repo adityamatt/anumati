@@ -79,6 +79,30 @@ describe("suggest — near-miss python3", () => {
   });
 });
 
+describe("suggest — python3 risk classification", () => {
+  it("rates a pure-stdlib import as low risk", () => {
+    const s = suggest(bash(`python3 -c "import statistics; print(statistics.mean([1,2]))"`), []);
+    expect(s!.risk).toBe("low");
+    expect(s!.riskReason).toBeUndefined();
+  });
+
+  it("rates a non-stdlib import as medium risk", () => {
+    const s = suggest(bash(`python3 -c "import pandas; print(pandas)"`), []);
+    expect(s!.risk).toBe("medium");
+  });
+
+  it("rates safe imports + file access as medium (python3 can touch files)", () => {
+    const s = suggest(bash(`python3 -c "import json; open('/data/x.json')"`), []);
+    expect(s!.risk).toBe("medium");
+  });
+
+  it("rates a mix of safe and unsafe imports as medium", () => {
+    // Regression: comma-import must surface numpy so it is not mistaken as safe.
+    const s = suggest(bash(`python3 -c "import json, numpy"`), []);
+    expect(s!.risk).toBe("medium");
+  });
+});
+
 describe("suggest — near-miss pip3", () => {
   const rule: Rule = { tool: "Bash", matcher: "pip3-install", allowed_packages: ["requests"] };
 

@@ -9,12 +9,15 @@ import {
   loadConfig,
 } from "./config.js";
 import { suggest } from "./suggest.js";
+import { debugDiagnose, formatDebugNote } from "./debug.js";
 import {
   storeSuggestion,
   defaultSuggestionsFile,
 } from "./suggest-store.js";
+import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
 import { runApply } from "./cli/apply.js";
+import { runDebug } from "./cli/debug.js";
 import type {
   Config,
   HookInput,
@@ -42,8 +45,9 @@ function resolveSuggestConfig(
   const project = projectConfig?.suggest ?? {};
   return {
     enabled: project.enabled ?? root.enabled ?? true,
-    stderr: project.stderr ?? root.stderr ?? true,
+    show: project.show ?? root.show ?? true,
     file: project.file ?? root.file ?? defaultSuggestionsFile(),
+    debug: project.debug ?? root.debug ?? false,
   };
 }
 
@@ -97,27 +101,44 @@ function runHook(): void {
 
   // Passthrough — try to suggest a config change that would auto-approve this.
   const sc = resolveSuggestConfig(projectConfig, rootConfig);
-  if (!sc.enabled) return;
 
   const allRules: Rule[] = [
     ...(projectConfig?.allow ?? []),
     ...(rootConfig?.allow ?? []),
   ];
 
-  const suggestion = suggest(input, allRules);
-  if (!suggestion) return;
+  const suggestion = sc.enabled ? suggest(input, allRules) : null;
 
-  if (sc.stderr) {
-    const riskNote =
-      suggestion.risk !== "low"
-        ? `\n   ⚠️  ${suggestion.risk} risk: ${suggestion.riskReason ?? ""}`
-        : "";
-    process.stderr.write(
-      `💡 anumati: ${suggestion.description}\n` +
-        `   Run: ${suggestion.command}${riskNote}\n`
-    );
+  if (suggestion) {
+    // Always persist to the store (for `anumati apply`), regardless of display.
+    storeSuggestion(suggestion, sc.file);
+    if (sc.show) {
+      const riskNote =
+        suggestion.risk !== "low"
+          ? `\n   ⚠️  ${suggestion.risk} risk: ${suggestion.riskReason ?? ""}`
+          : "";
+      emitMessage(
+        `💡 anumati: ${suggestion.description}\n` +
+          `   Run: ${suggestion.command}${riskNote}`
+      );
+    }
+    return;
   }
-  storeSuggestion(suggestion, sc.file);
+
+  // No actionable suggestion. In debug mode, explain WHY this fell through so
+  // the user can decide how to expand their config.
+  if (sc.debug && sc.show) {
+    const note = debugDiagnose(input);
+    if (note) emitMessage(formatDebugNote(note).trimEnd());
+  }
+}
+
+// Surface an informational message to the user WITHOUT changing the decision.
+// PreToolUse hook stderr is only shown in the debug log on exit 0, so we use
+// the `systemMessage` JSON channel instead, which Claude Code displays inline.
+// Omitting permissionDecision keeps the call on its normal passthrough path.
+function emitMessage(message: string): void {
+  process.stdout.write(JSON.stringify({ systemMessage: message }));
 }
 
 function readVersion(): string {
@@ -137,8 +158,15 @@ const HELP = `anumati — a PreToolUse hook for Claude Code that auto-allows saf
 Usage:
   anumati [config-path]            Run as a PreToolUse hook (reads a JSON request on stdin).
                                    config-path defaults to ~/.claude/permissions.json.
+  anumati init [--root|--project]  Create a starter config with safe default rules.
+                                   Prompts for the level if not specified; --force to overwrite.
+                                   Also scaffolds an audit log and registers the PreToolUse
+                                   hook in settings.json (--no-audit / --no-hook to skip;
+                                   --debug to start with debug mode on).
   anumati add <matcher> [flags]    Add or extend an allow rule in a config.
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
+  anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
+                                   Targets the root config; --project / --config <path> to retarget.
   anumati --help | -h              Show this help.
   anumati --version | -V           Show the installed version.
 
@@ -159,12 +187,23 @@ Docs: https://github.com/adityamatt/anumati#readme`;
 function main(): void {
   const subcommand = process.argv[2];
 
+  if (subcommand === "init") {
+    runInit(process.argv.slice(2)).catch((err) => {
+      console.error(`✗ ${(err as Error).message}`);
+      process.exit(1);
+    });
+    return;
+  }
   if (subcommand === "add") {
     runAdd(process.argv.slice(2));
     return;
   }
   if (subcommand === "apply") {
     runApply(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "debug") {
+    runDebug(process.argv.slice(2));
     return;
   }
   if (subcommand === "--help" || subcommand === "-h") {

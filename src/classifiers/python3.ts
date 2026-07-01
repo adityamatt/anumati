@@ -5,6 +5,26 @@ const DANGEROUS_BUILTINS = [
   /\b__import__\s*\(/,
 ];
 
+// Pure-computation stdlib modules that are safe to bless wholesale: they have
+// no file, network, subprocess, or code-execution entry points of their own.
+// Deliberately EXCLUDES anything with I/O side channels — e.g. pandas/numpy
+// (read_pickle/load = arbitrary file+code), pathlib/tempfile/io (filesystem),
+// and everything in ALWAYS_BLOCKED. open() in user code is still path-checked
+// separately, so blessing these imports does not widen file access.
+export const KNOWN_SAFE_IMPORTS = [
+  "json", "math", "cmath", "statistics", "decimal", "fractions",
+  "random", "secrets", "string", "re", "textwrap", "difflib", "unicodedata",
+  "collections", "collections.abc", "itertools", "functools", "operator",
+  "heapq", "bisect", "array", "enum", "dataclasses", "typing", "types",
+  "copy", "numbers", "datetime", "time", "calendar",
+  "hashlib", "hmac", "uuid", "base64", "binascii", "struct",
+  "pprint", "reprlib", "contextlib", "abc", "warnings",
+];
+
+// Excluded despite seeming innocuous — these have file/network entry points
+// that bypass the open() path check: codecs (codecs.open), zoneinfo (reads tz
+// files), io/pathlib/tempfile (filesystem), and anything in ALWAYS_BLOCKED.
+
 // Modules that are always blocked regardless of allowed_imports
 export const ALWAYS_BLOCKED = new Set([
   "os", "os.path", "subprocess", "socket", "requests",
@@ -19,10 +39,28 @@ export const ALWAYS_BLOCKED = new Set([
 
 export function extractImports(code: string): string[] {
   const imports: string[] = [];
-  const re = /\bimport\s+([\w.]+)|\bfrom\s+([\w.]+)\s+import/g;
+  // Two forms:
+  //   from MODULE import ...            → captures MODULE (group 1)
+  //   import MOD [as X][, MOD2 ...]     → captures the full clause (group 2)
+  // The `from` alternative is tried first so the trailing `import` of a
+  // from-statement is consumed and never re-matched as a bare import. Capturing
+  // the WHOLE import clause (not just the first module) is critical: a bare
+  // `import json, subprocess` must surface BOTH names, or a blocked module
+  // could hide behind an allowed one and bypass the safety check.
+  const re = /\bfrom\s+([\w.]+)\s+import\b|\bimport\s+([^\n;]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(code)) !== null) {
-    imports.push(m[1] ?? m[2]);
+    if (m[1] !== undefined) {
+      imports.push(m[1]);
+      continue;
+    }
+    // Bare import: split the clause on commas, drop any `as alias`, and take
+    // the leading dotted identifier of each part (trims trailing comments).
+    for (const part of m[2].split(",")) {
+      const mod = part.trim().split(/\s+as\s+/)[0].trim();
+      const id = /^[\w.]+/.exec(mod);
+      if (id) imports.push(id[0]);
+    }
   }
   return imports;
 }

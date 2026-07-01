@@ -9,7 +9,7 @@ A `PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows 
 Every time Claude Code is about to run a tool (Bash, Read, …), this hook intercepts the request and checks it against your allow rules. anumati is **allow-only**: it can auto-approve a call or stay out of the way, but it never blocks anything itself.
 
 1. **A rule matches** → the call is auto-approved, with no prompt.
-2. **No rule matches** → Claude Code shows its normal permission dialog, and anumati prints a 💡 suggestion to stderr showing how to allow it next time.
+2. **No rule matches** → Claude Code shows its normal permission dialog, and anumati surfaces a 💡 suggestion (via the hook's `systemMessage`) showing how to allow it next time.
 
 Because every rule can only ever *allow*, rule order doesn't affect the decision — if any rule matches, the call is approved. (Internally the first match wins and short-circuits, which is what gets recorded in the audit log.)
 
@@ -31,7 +31,23 @@ Or run without installing via `npx anumati ~/.claude/permissions.json`.
 
 ## Setup
 
-**1. Create a config file** at `~/.claude/permissions.json`:
+The fastest way — one command does everything:
+
+```bash
+anumati init
+```
+
+`anumati init` prompts whether to set up a **project** config (this folder) or a **root** config (global, applies everywhere), shows which already exist, and then:
+
+1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-read`, `safe-inspect`, `git-read`, `npx-tsc`, plus a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …). Those modules have no file, network, or code-execution entry points, and any `open()` in your script is still path-checked — so blessing them doesn't widen file access. (Libraries with I/O side channels like `numpy`/`pandas` are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
+2. **Scaffolds an audit log** (`anumati-audit.jsonl`) next to the config.
+3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
+
+Pass `--project` / `--root` to skip the prompt, `--force` to overwrite an existing config, and `--no-audit` / `--no-hook` to skip those steps. Add more rules as you go with `anumati add` (see below).
+
+---
+
+Prefer to do it by hand? Write the config yourself — a fuller example:
 
 ```json
 {
@@ -53,7 +69,7 @@ Or run without installing via `npx anumati ~/.claude/permissions.json`.
 }
 ```
 
-**2. Wire into `~/.claude/settings.json`**:
+…then wire it into `~/.claude/settings.json` yourself (this is what `anumati init` automates):
 
 ```json
 {
@@ -117,7 +133,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `matched` | Log only allow hits (default) |
 | `all` | Log everything, including passthroughs |
 
-Audit entries are appended as newline-delimited JSON to `audit_file`.
+Audit entries are appended as newline-delimited JSON to `audit_file`. `anumati init` sets this up for you — it scaffolds an empty `anumati-audit.jsonl` next to the config and points `audit_file` at it (pass `--no-audit` to skip). The path is taken verbatim with no `~` expansion, so set an absolute path if you write the config by hand. If `audit_file` is unset, auditing is disabled entirely.
 
 ## Suggestions — let the config build itself
 
@@ -132,6 +148,22 @@ When a command falls through to the permission dialog, anumati analyzes it and p
 Every suggestion is **verified** — anumati only suggests a change if re-running the real matcher with that change would actually allow the command. Commands that can never be safely approved (e.g. `python3 -c "import os"`, `gh api ... -X POST`, anything with shell substitution) produce **no** suggestion.
 
 Suggestions are also appended to `~/.claude/anumati-suggestions.jsonl` so you can review them in a batch later.
+
+### `anumati init`
+
+Scaffold a starter config, an audit log, and the PreToolUse hook in one step:
+
+```bash
+anumati init             # prompts: project (this folder) or root (global)?
+anumati init --project   # write <cwd>/.claude/permissions.json (skip prompt)
+anumati init --root      # write ~/.claude/permissions.json (skip prompt)
+anumati init --force     # overwrite an existing config
+anumati init --no-audit  # don't scaffold the audit log
+anumati init --no-hook   # don't register the hook in settings.json
+anumati init --debug     # start with debug mode on (explains passthroughs)
+```
+
+Shows which configs already exist, then writes the chosen config, an empty `anumati-audit.jsonl`, and a PreToolUse hook in the `settings.json` beside it. The hook is merged into existing settings (other hooks preserved) and is idempotent. Refuses to overwrite an existing config unless `--force` is given; an existing audit log is never clobbered, and if `settings.json` is invalid JSON the hook step is skipped with a warning (the config is still written). **Restart Claude Code after init for the hook to load.**
 
 ### `anumati add`
 
@@ -174,8 +206,9 @@ Tune behavior with an optional `suggest` block (all fields optional):
 {
   "suggest": {
     "enabled": true,
-    "stderr": true,
-    "file": "~/.claude/anumati-suggestions.jsonl"
+    "show": true,
+    "file": "~/.claude/anumati-suggestions.jsonl",
+    "debug": false
   },
   "allow": []
 }
@@ -184,8 +217,31 @@ Tune behavior with an optional `suggest` block (all fields optional):
 | Field | Default | Description |
 |-------|---------|-------------|
 | `enabled` | `true` | Generate suggestions on passthrough |
-| `stderr` | `true` | Print the 💡 suggestion inline with the permission prompt |
+| `show` | `true` | Surface the 💡 suggestion to the user (via the hook's `systemMessage`, shown with the permission prompt) |
 | `file` | `~/.claude/anumati-suggestions.jsonl` | Where suggestions accumulate |
+| `debug` | `false` | When a command falls through and *no* suggestion applies, print a 🔍 note explaining **why** it wasn't auto-approved |
+
+### Debug mode — why didn't this get approved?
+
+Some commands can't be auto-approved no matter what rule you add — a `;`-separated chain, a redirection like `2>/dev/null`, `$(...)` substitution, or a command no matcher covers. Normally anumati stays silent in those cases (no actionable suggestion exists). Turn on `debug` while expanding your config to get an explanation instead:
+
+```
+🔍 anumati [debug]: Command chains segments with ";", which no matcher accepts (it means independent commands).
+   → Split this into separate tool calls, or use `&&` if a matcher supports it (e.g. `cd X && cargo build`).
+```
+
+Debug notes are surfaced via the hook's `systemMessage` (never stored), shown only on passthrough, and always defer to a real 💡 suggestion when one is available. `debug` works independently of `enabled`, so you can keep suggestions off and still get diagnostics.
+
+Toggle it without hand-editing the config:
+
+```bash
+anumati debug on            # turn on in the root config (~/.claude/permissions.json)
+anumati debug off           # turn off
+anumati debug on --project  # target <cwd>/.claude/permissions.json instead
+anumati debug on --config ./path/permissions.json
+```
+
+`anumati debug` only flips `suggest.debug`, merging into the existing config (rules, audit, and other suggest fields are preserved). It needs a config to already exist — run `anumati init` (or `anumati init --debug` to start with it on) first. Because the hook re-reads the config on every call, a toggle takes effect immediately — no restart needed.
 
 ## Development
 
