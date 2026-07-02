@@ -39,6 +39,16 @@ describe("audit — level: matched", () => {
     expect(entry.rule_desc).toBe("curl allowed");
   });
 
+  it("writes ts with the local timezone offset, not UTC Z", () => {
+    audit({ audit_file: TMP, audit_level: "matched" }, bashInput, allowResult);
+    const [entry] = lines();
+    // Local ISO 8601: ends with a numeric offset (+/-HH:MM), never the UTC "Z".
+    expect(entry.ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/);
+    expect(entry.ts).not.toMatch(/Z$/);
+    // The instant it encodes must match the wall clock at write time.
+    expect(Math.abs(new Date(entry.ts).getTime() - Date.now())).toBeLessThan(5000);
+  });
+
   it("skips passthrough", () => {
     audit({ audit_file: TMP, audit_level: "matched" }, bashInput, passthroughResult);
     expect(existsSync(TMP)).toBe(false);
