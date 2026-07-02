@@ -19,6 +19,14 @@ export interface Rule {
 export interface AuditConfig {
   audit_file?: string;
   audit_level?: "off" | "matched" | "all";
+  /**
+   * When set, non-approved (passthrough) calls are logged here instead of to
+   * `audit_file`, keeping approvals and denials in separate files. Independent
+   * of `audit_level`: passthroughs are recorded whenever this is set (unless
+   * level is "off"). If unset, passthroughs go to `audit_file` only at level
+   * "all".
+   */
+  passthrough_file?: string;
 }
 
 export interface SuggestConfig {

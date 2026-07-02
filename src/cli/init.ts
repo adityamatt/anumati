@@ -47,11 +47,20 @@ export function auditFileFor(configPath: string): string {
   return join(dirname(configPath), "anumati-audit.jsonl");
 }
 
-export function starterConfig(auditFile?: string, debug = false): Config {
+// Non-approved (passthrough) calls are logged separately from approvals, in a
+// sibling file — same directory + absolute-path rationale as auditFileFor.
+export function passthroughFileFor(configPath: string): string {
+  return join(dirname(configPath), "anumati-passthrough.jsonl");
+}
+
+export function starterConfig(auditFile?: string, debug = false, passthroughFile?: string): Config {
   const config: Config = {};
   if (auditFile) {
-    // "matched" logs only allow hits — low-noise but useful for review.
+    // "matched" logs only allow hits — low-noise but useful for review. A
+    // separate passthrough_file captures the calls that fell through, so denials
+    // are recorded without mixing them into the approvals log.
     config.audit = { audit_file: auditFile, audit_level: "matched" };
+    if (passthroughFile) config.audit.passthrough_file = passthroughFile;
   }
   if (debug) {
     config.suggest = { debug: true };
@@ -81,6 +90,7 @@ export interface InitResult {
   configPath: string;
   ruleCount: number;
   auditFile?: string; // set when an audit log was scaffolded
+  passthroughFile?: string; // set when a passthrough (denials) log was scaffolded
   hook?: WireResult; // set when hook wiring succeeded
   hookError?: string; // set when hook wiring failed (non-fatal — config still written)
 }
@@ -131,16 +141,20 @@ export function applyInit(opts: InitOptions & { config: string }): InitResult {
 
   const withAudit = opts.audit !== false; // default on
   const auditFile = withAudit ? auditFileFor(configPath) : undefined;
-  const config = starterConfig(auditFile, opts.debug === true);
+  const passthroughFile = withAudit ? passthroughFileFor(configPath) : undefined;
+  const config = starterConfig(auditFile, opts.debug === true, passthroughFile);
 
   const dir = dirname(configPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 
-  // Create the audit log empty so it is immediately visible next to the config.
+  // Create the logs empty so they are immediately visible next to the config.
   // Never clobber an existing log (only the config write is gated by --force).
   if (auditFile && !existsSync(auditFile)) {
     writeFileSync(auditFile, "");
+  }
+  if (passthroughFile && !existsSync(passthroughFile)) {
+    writeFileSync(passthroughFile, "");
   }
 
   // Register the PreToolUse hook in the settings.json beside this config, so
@@ -166,7 +180,7 @@ export function applyInit(opts: InitOptions & { config: string }): InitResult {
     }
   }
 
-  return { configPath, ruleCount: config.allow?.length ?? 0, auditFile, hook, hookError };
+  return { configPath, ruleCount: config.allow?.length ?? 0, auditFile, passthroughFile, hook, hookError };
 }
 
 export function parseInitArgs(args: string[]): InitOptions {
@@ -253,6 +267,9 @@ function printResult(result: InitResult): void {
   }
   if (result.auditFile) {
     console.log(`\nAudit log (allow decisions): ${prettyPath(result.auditFile)}`);
+  }
+  if (result.passthroughFile) {
+    console.log(`Passthrough log (non-approved calls): ${prettyPath(result.passthroughFile)}`);
   }
 
   if (result.hookError) {

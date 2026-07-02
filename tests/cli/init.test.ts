@@ -10,6 +10,7 @@ import {
   resolveInitTarget,
   prettyPath,
   auditFileFor,
+  passthroughFileFor,
   STARTER_RULES,
 } from "../../src/cli/init.js";
 import { defaultConfigPath, projectConfigPath } from "../../src/config.js";
@@ -168,17 +169,25 @@ describe("applyInit — audit log", () => {
     expect(existsSync(expected)).toBe(true);
   });
 
-  it("references the audit log from the config with audit_level matched", () => {
+  it("references the audit log from the config with audit_level matched + passthrough_file", () => {
     applyInit({ config: configPath });
     expect(read().audit).toEqual({
       audit_file: auditFileFor(configPath),
       audit_level: "matched",
+      passthrough_file: passthroughFileFor(configPath),
     });
   });
 
   it("creates the audit log empty", () => {
     applyInit({ config: configPath });
     expect(readFileSync(auditFileFor(configPath), "utf-8")).toBe("");
+  });
+
+  it("scaffolds a passthrough log next to the config", () => {
+    const res = applyInit({ config: configPath });
+    expect(res.passthroughFile).toBe(passthroughFileFor(configPath));
+    expect(existsSync(passthroughFileFor(configPath))).toBe(true);
+    expect(readFileSync(passthroughFileFor(configPath), "utf-8")).toBe("");
   });
 
   it("does not clobber an existing audit log on --force re-init", () => {

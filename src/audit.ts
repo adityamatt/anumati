@@ -18,17 +18,7 @@ function localISOString(date: Date): string {
   );
 }
 
-export function audit(
-  config: AuditConfig | undefined,
-  input: HookInput,
-  result: MatchResult
-): void {
-  const level = config?.audit_level ?? "matched";
-  const file = config?.audit_file;
-
-  if (level === "off" || !file) return;
-  if (level === "matched" && result.decision === null) return;
-
+function writeEntry(file: string, input: HookInput, result: MatchResult): void {
   const entry = {
     ts: localISOString(new Date()),
     tool: input.tool_name,
@@ -43,4 +33,28 @@ export function audit(
   } catch {
     // audit failure must not block execution
   }
+}
+
+export function audit(
+  config: AuditConfig | undefined,
+  input: HookInput,
+  result: MatchResult
+): void {
+  const level = config?.audit_level ?? "matched";
+  if (level === "off") return;
+
+  const auditFile = config?.audit_file;
+  const passthroughFile = config?.passthrough_file;
+
+  if (result.decision === null) {
+    // Non-approved (passthrough) call. Route to its own file when configured;
+    // otherwise fall back to audit_file only when level is "all" (legacy behavior
+    // where approvals and passthroughs share one file).
+    const target = passthroughFile ?? (level === "all" ? auditFile : undefined);
+    if (target) writeEntry(target, input, result);
+    return;
+  }
+
+  // Approved call — always logged (for both "matched" and "all") to audit_file.
+  if (auditFile) writeEntry(auditFile, input, result);
 }
