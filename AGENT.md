@@ -10,10 +10,11 @@ stdin (JSON from Claude Code)
         ├── src/config.ts   defaultConfigPath / projectConfigPath / loadConfig
         ├── src/matcher.ts  evaluate() — iterates allow rules in order
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
-        │           ├── curl / gh / python3-pipe / pip3-install / npm-script  (parameterized)
+        │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
         │           └── cargo / go / git-read / npx-tsc / safe-inspect / safe-read
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
-        │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts)
+        │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
+        │            nodejs safety from classifiers/nodejs.ts)
         ├── src/audit.ts    optional JSON audit log
         └── on passthrough:
               src/suggest.ts        suggest(input, allRules) → Suggestion | null
@@ -33,6 +34,7 @@ interface Rule {
   matcher?: string;            // named matcher (required — no regex fallback)
   allowed_domains?: string[];  // curl
   allowed_imports?: string[];  // python3-pipe
+  allowed_modules?: string[];  // nodejs-pipe
   allowed_repos?: string[];    // gh
   allowed_packages?: string[]; // pip3-install
   allowed_scripts?: string[];  // npm-script
@@ -73,9 +75,9 @@ PreToolUse hook **stderr is invisible in the UI on exit 0** (debug-log only). To
 
 ```
 npm run build    # tsc → dist/
-npm test         # vitest run (547 tests)
+npm test         # vitest run
 npm run dev      # ts-node src/index.ts (without build)
-anumati add <matcher> [--domain/--imports/--packages/--scripts/--repos/--paths X[,Y]] [--config P]
+anumati add <matcher> [--domain/--imports/--modules/--packages/--scripts/--repos/--paths X[,Y]] [--config P]
 anumati apply [--all|--clear] [--config P]
 ```
 
@@ -105,6 +107,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `curl` | Bash | allow curl to specific https domains (+ pipe to safe builtins) | `allowed_domains` |
 | `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` (no write methods) | `allowed_repos` |
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins/dynamic open() | `allowed_imports`, `open.allowed_paths` |
+| `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules; fs/network/child_process/vm/os always blocked, no eval/Function/dynamic require | `allowed_modules` |
 | `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create, `&& echo`) | `allowed_packages` |
 | `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` for allowlisted scripts + read-only queries (ls/view/outdated) | `allowed_scripts` |
 | `cargo` | Bash | allow cargo check/build/test/clippy/fmt --check/tree/… (+ cd && variant, pipe to builtins) | — |
@@ -125,7 +128,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 
 Runs only on passthrough. Two strategies:
 
-1. **Near-miss** — an existing rule with an allowlist (`curl`/`python3-pipe`/`pip3-install`/`npm-script`/`gh`) that would match if a domain/import/package/script/repo were added.
+1. **Near-miss** — an existing rule with an allowlist (`curl`/`python3-pipe`/`nodejs-pipe`/`pip3-install`/`npm-script`/`gh`) that would match if a domain/import/module/package/script/repo were added.
 2. **New rule** — classify the command and suggest adding a matcher that doesn't exist in the config yet. Specific families are tried before the broad `safe-inspect` (e.g. `git log` → `git-read`, not `safe-inspect`).
 
 **Invariant — suggestions are verified, never hand-rolled.** Each suggestor extracts candidate params, then re-runs the *real matcher* with those params added; a `Suggestion` is emitted only if the matcher then accepts the command. This guarantees suggestions can't drift from matcher logic and can never propose something unsafe — `ALWAYS_BLOCKED` imports, `gh` write methods, dynamic `open()`, `..` traversal, and shell substitution all make the matcher reject, so no suggestion is produced. When extending a matcher, the suggestor stays correct automatically as long as it re-verifies.

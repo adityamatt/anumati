@@ -146,6 +146,45 @@ describe("evaluate — python3-pipe standalone", () => {
   });
 });
 
+const ALLOW_NODE: Rule = {
+  tool: "Bash", matcher: "nodejs-pipe",
+  allowed_modules: ["path", "crypto"],
+  desc: "safe nodejs pipe",
+};
+
+describe("evaluate — nodejs-pipe standalone", () => {
+  it("allows safe -e code with listed modules", () => {
+    const r = evaluate(bash(`node -e "const {join}=require('path'); console.log(join('a'))"`), [ALLOW_NODE]);
+    expect(r.decision).toBe("allow");
+  });
+
+  it("allows pipe chain: grep | node", () => {
+    const r = evaluate(bash(`grep foo file.txt | node -e "console.log(require('crypto').randomUUID())"`), [ALLOW_NODE]);
+    expect(r.decision).toBe("allow");
+  });
+
+  it("returns null for unlisted module", () => {
+    expect(evaluate(bash(`node -e "require('os')"`), [ALLOW_NODE]).decision).toBeNull();
+  });
+
+  it("returns null for always-blocked module even if listed", () => {
+    const rule: Rule = { tool: "Bash", matcher: "nodejs-pipe", allowed_modules: ["fs"] };
+    expect(evaluate(bash(`node -e "require('fs')"`), [rule]).decision).toBeNull();
+  });
+
+  it("returns null for eval() builtin", () => {
+    expect(evaluate(bash(`node -e "eval('process.exit()')"`), [ALLOW_NODE]).decision).toBeNull();
+  });
+
+  it("returns null for && chained commands", () => {
+    expect(evaluate(bash(`node -e "console.log(1)" && rm -rf /`), [ALLOW_NODE]).decision).toBeNull();
+  });
+
+  it("allows no modules in code", () => {
+    expect(evaluate(bash(`node -e "console.log('hello')"`), [ALLOW_NODE]).decision).toBe("allow");
+  });
+});
+
 describe("evaluate — curl piped to python3", () => {
   it("allows curl | python3 -c with safe imports", () => {
     const cmd = `curl -s "https://hikerapi.com/p/user-liked-posts" 2>/dev/null | python3 -c "import sys; from html.parser import HTMLParser; print(sys.stdin.read())"`;

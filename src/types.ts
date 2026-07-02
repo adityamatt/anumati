@@ -7,6 +7,7 @@ export interface Rule {
   matcher?: string;
   allowed_domains?: string[];
   allowed_imports?: string[];
+  allowed_modules?: string[];
   allowed_repos?: string[];
   allowed_packages?: string[];
   allowed_scripts?: string[];

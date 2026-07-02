@@ -3,6 +3,7 @@ import { matchCurl } from "./curl.js";
 import { matchNpxTsc } from "./npx-tsc.js";
 import { matchSafeRead } from "./safe-read.js";
 import { matchPython3Pipe } from "./python3-pipe.js";
+import { matchNodejsPipe } from "./nodejs-pipe.js";
 import { matchGh } from "./gh.js";
 import { matchPip3Install } from "./pip3-install.js";
 import { matchSafeInspect } from "./safe-inspect.js";
@@ -20,6 +21,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "npx-tsc":      return matchNpxTsc(cmd);
     case "safe-read":    return matchSafeRead(filePath);
     case "python3-pipe": return matchPython3Pipe(cmd, rule.allowed_imports ?? [], rule.open?.allowed_paths ?? [], input.cwd ?? "");
+    case "nodejs-pipe":  return matchNodejsPipe(cmd, rule.allowed_modules ?? [], input.cwd ?? "");
     case "gh":           return matchGh(cmd, rule.allowed_repos ?? [], rule.allowed_imports ?? [], rule.open?.allowed_paths ?? []);
     case "pip3-install": return matchPip3Install(cmd, rule.allowed_packages ?? []);
     case "safe-inspect": return matchSafeInspect(cmd);

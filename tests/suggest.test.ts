@@ -103,6 +103,50 @@ describe("suggest — python3 risk classification", () => {
   });
 });
 
+describe("suggest — near-miss nodejs", () => {
+  const rule: Rule = { tool: "Bash", matcher: "nodejs-pipe", allowed_modules: ["path"] };
+
+  it("suggests adding a missing module", () => {
+    const s = suggest(bash(`node -e "require('crypto').randomUUID()"`), [rule]);
+    expect(s).not.toBeNull();
+    expect(s!.matcher).toBe("nodejs-pipe");
+    expect(s!.command).toBe("anumati add nodejs-pipe --modules crypto");
+    expect(s!.configDelta).toEqual({ allowed_modules: ["crypto"] });
+  });
+
+  it("never suggests an ALWAYS_BLOCKED module", () => {
+    expect(suggest(bash(`node -e "require('fs')"`), [rule])).toBeNull();
+    expect(suggest(bash(`node -e "require('child_process')"`), [rule])).toBeNull();
+  });
+
+  it("never suggests for a dynamic require()", () => {
+    expect(suggest(bash(`node -e "require(process.argv[2])"`), [rule])).toBeNull();
+  });
+
+  it("normalizes node: prefix to the bare module name", () => {
+    const s = suggest(bash(`node -e "require('node:crypto')"`), [rule]);
+    expect(s!.configDelta).toEqual({ allowed_modules: ["crypto"] });
+  });
+});
+
+describe("suggest — nodejs risk classification", () => {
+  it("rates a pure-compute built-in as low risk", () => {
+    const s = suggest(bash(`node -e "console.log(require('path').sep)"`), []);
+    expect(s!.risk).toBe("low");
+    expect(s!.riskReason).toBeUndefined();
+  });
+
+  it("rates an unrecognized module as medium risk", () => {
+    const s = suggest(bash(`node -e "require('lodash')"`), []);
+    expect(s!.risk).toBe("medium");
+  });
+
+  it("rates code with no modules as low risk", () => {
+    const s = suggest(bash(`node -e "console.log(1+1)"`), []);
+    expect(s!.risk).toBe("low");
+  });
+});
+
 describe("suggest — near-miss pip3", () => {
   const rule: Rule = { tool: "Bash", matcher: "pip3-install", allowed_packages: ["requests"] };
 
@@ -190,6 +234,12 @@ describe("suggest — new rule (no existing matcher)", () => {
     const s = suggest(bash("gh api repos/cli/cli/releases"), []);
     expect(s!.matcher).toBe("gh");
     expect(s!.command).toBe("anumati add gh --repos cli/cli");
+  });
+
+  it("node with a fresh module", () => {
+    const s = suggest(bash(`node -e "require('crypto').randomUUID()"`), []);
+    expect(s!.matcher).toBe("nodejs-pipe");
+    expect(s!.command).toBe("anumati add nodejs-pipe --modules crypto");
   });
 
   it("cargo command", () => {

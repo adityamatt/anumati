@@ -7,6 +7,7 @@ export interface AddOptions {
   matcher: string;
   domains?: string[];
   imports?: string[];
+  modules?: string[];
   packages?: string[];
   scripts?: string[];
   repos?: string[];
@@ -63,6 +64,7 @@ export function applyAdd(opts: AddOptions): AddResult {
   const r = rule as unknown as Record<string, unknown>;
   if (opts.domains) mergeArray(r, "allowed_domains", opts.domains);
   if (opts.imports) mergeArray(r, "allowed_imports", opts.imports);
+  if (opts.modules) mergeArray(r, "allowed_modules", opts.modules);
   if (opts.packages) mergeArray(r, "allowed_packages", opts.packages);
   if (opts.scripts) mergeArray(r, "allowed_scripts", opts.scripts);
   if (opts.repos) mergeArray(r, "allowed_repos", opts.repos);
@@ -84,6 +86,7 @@ const LIST_FLAGS: Record<string, keyof AddOptions> = {
   "--domain": "domains",
   "--domains": "domains",
   "--imports": "imports",
+  "--modules": "modules",
   "--packages": "packages",
   "--scripts": "scripts",
   "--repos": "repos",
@@ -129,7 +132,7 @@ export function runAdd(argv: string[]): void {
   const matcher = args[0];
   if (!matcher || matcher.startsWith("--")) {
     console.error(
-      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--config /path]",
+      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--modules X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--config /path]",
     );
     process.exit(1);
   }

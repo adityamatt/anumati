@@ -5,6 +5,8 @@ export type CommandKind =
   | "safe-builtin"
   | "python3-c"
   | "python3-script"
+  | "nodejs-e"
+  | "nodejs-script"
   | "dangerous"
   | "unknown";
 

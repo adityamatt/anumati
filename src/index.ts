@@ -177,6 +177,7 @@ Usage:
 add flags:
   --domain X[,Y]     domains for the "curl" matcher
   --imports X[,Y]    Python modules for the "python3-pipe" matcher
+  --modules X[,Y]    Node built-in modules for the "nodejs-pipe" matcher
   --packages X[,Y]   packages for the "pip3-install" matcher
   --scripts X[,Y]    script names for the "npm-script" matcher
   --repos X[,Y]      owner/repo slugs for the "gh" matcher
