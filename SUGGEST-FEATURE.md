@@ -39,10 +39,6 @@ export interface Suggestion {
   matcher: string;
   /** The specific config fields that would need to be added/changed */
   configDelta: Record<string, unknown>;
-  /** Risk assessment */
-  risk: "low" | "medium" | "high";
-  /** Why this risk level */
-  riskReason?: string;
   /** The original command/input that triggered this */
   trigger: string;
 }
@@ -85,14 +81,6 @@ If no near-miss was found, classify the command and suggest adding a new rule en
 | npm/pnpm/yarn run X                  | `anumati add npm-script --scripts X`                    |
 | pip3 install X                       | `anumati add pip3-install --packages X`                 |
 
-### 3. Risk assessment
-
-Each suggestion gets a risk level:
-
-- **low**: read-only commands, safe builtins, type checking, linters
-- **medium**: commands that write files locally (cargo build, npm run build), network reads (curl to specific domain)
-- **high**: commands that can make network calls AND write (pip install), interpreters with broad capabilities
-
 ## Implementation: suggest.ts
 
 ```typescript
@@ -106,8 +94,6 @@ export interface Suggestion {
   description: string;
   matcher: string;
   configDelta: Record<string, unknown>;
-  risk: "low" | "medium" | "high";
-  riskReason?: string;
   trigger: string;
 }
 
@@ -143,7 +129,6 @@ function suggestRead(input: HookInput, allRules: Rule[]): Suggestion | null {
     description: "Auto-approve file reads (blocks path traversal)",
     matcher: "safe-read",
     configDelta: { tool: "Read", matcher: "safe-read" },
-    risk: "low",
     trigger: filePath,
   };
 }
@@ -262,13 +247,9 @@ if (projectResult.decision === "allow" || rootResult.decision === "allow") {
   const suggestion = suggest(input, allRules);
 
   if (suggestion) {
-    const riskNote =
-      suggestion.risk !== "low"
-        ? `\n   ⚠️  ${suggestion.risk} risk: ${suggestion.riskReason ?? ""}`
-        : "";
     process.stderr.write(
       `💡 anumati: ${suggestion.description}\n` +
-        `   Run: ${suggestion.command}${riskNote}\n`,
+        `   Run: ${suggestion.command}\n`,
     );
     storeSuggestion(suggestion);
   }
@@ -377,11 +358,7 @@ export function runApply(): void {
   console.log(`${unique.length} pending suggestion(s):\n`);
   for (let i = 0; i < unique.length; i++) {
     const s = unique[i];
-    const risk =
-      s.risk === "low"
-        ? ""
-        : ` [${s.risk} risk${s.riskReason ? ": " + s.riskReason : ""}]`;
-    console.log(`  ${i + 1}. ${s.description}${risk}`);
+    console.log(`  ${i + 1}. ${s.description}`);
     console.log(`     ${s.command}`);
     console.log();
   }
@@ -411,7 +388,6 @@ Keep it concise — Claude Code shows this inline with the permission prompt:
 ```
 💡 anumati: Auto-approve "python3 analyze.py" → add "pandas" to allowed_imports
    Run: anumati add python3-pipe --imports pandas
-   ⚠️  medium risk: pandas can read/write local files
 ```
 
 For new rules:
@@ -426,7 +402,6 @@ For curl domains:
 ```
 💡 anumati: Auto-approve curl to api.openai.com
    Run: anumati add curl --domain api.openai.com
-   ⚠️  medium risk: allows network calls to this domain
 ```
 
 ## Config Changes

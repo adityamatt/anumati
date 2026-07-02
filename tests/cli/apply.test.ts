@@ -27,7 +27,6 @@ function stored(over: Partial<StoredSuggestion>): StoredSuggestion {
     description: "d",
     matcher: "curl",
     configDelta: {},
-    risk: "low",
     trigger: "t",
     ...over,
   };

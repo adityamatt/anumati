@@ -48,11 +48,6 @@ export function applyOneSuggestion(
   return applyAdd(suggestionToAddOptions(s, config));
 }
 
-function riskTag(s: StoredSuggestion): string {
-  if (s.risk === "low") return "";
-  return ` [${s.risk} risk${s.riskReason ? ": " + s.riskReason : ""}]`;
-}
-
 /** CLI entrypoint: `anumati apply [--all] [--clear] [--config /path]` */
 export function runApply(argv: string[]): void {
   const flags = argv.slice(1);
@@ -76,7 +71,7 @@ export function runApply(argv: string[]): void {
   console.log(`${unique.length} pending suggestion(s):\n`);
   for (let i = 0; i < unique.length; i++) {
     const s = unique[i];
-    console.log(`  ${i + 1}. ${s.description}${riskTag(s)}`);
+    console.log(`  ${i + 1}. ${s.description}`);
     console.log(`     ${s.command}`);
     console.log();
   }

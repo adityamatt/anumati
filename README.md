@@ -143,9 +143,10 @@ Audit entries are appended as newline-delimited JSON to `audit_file`. `anumati i
 When a command falls through to the permission dialog, anumati analyzes it and prints the exact config change that would auto-approve it:
 
 ```
-💡 anumati: Auto-approve curl to api.openai.com
-   Run: anumati add curl --domain api.openai.com
-   ⚠️  medium risk: allows network requests to this domain
+┌───────────────────────────────────────────────
+│ 💡 anumati: Auto-approve curl to api.openai.com
+│    Run: anumati add curl --domain api.openai.com
+└───────────────────────────────────────────────
 ```
 
 Every suggestion is **verified** — anumati only suggests a change if re-running the real matcher with that change would actually allow the command. Commands that can never be safely approved (e.g. `python3 -c "import os"`, `gh api ... -X POST`, anything with shell substitution) produce **no** suggestion.
