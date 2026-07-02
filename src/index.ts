@@ -114,13 +114,9 @@ function runHook(): void {
     // Always persist to the store (for `anumati apply`), regardless of display.
     storeSuggestion(suggestion, sc.file);
     if (sc.show) {
-      const riskNote =
-        suggestion.risk !== "low"
-          ? `\n   ⚠️  ${suggestion.risk} risk: ${suggestion.riskReason ?? ""}`
-          : "";
       emitMessage(
         `💡 anumati: ${suggestion.description}\n` +
-          `   Run: ${suggestion.command}${riskNote}`
+          `   Run: ${suggestion.command}`
       );
     }
     return;
@@ -134,6 +130,21 @@ function runHook(): void {
   }
 }
 
+// Wrap a (possibly multi-line) message in a box so it reads as a distinct
+// dialog. Uses Unicode box-drawing chars rather than ASCII `|`/`-`: systemMessage
+// is rendered as markdown, where a leading `|` starts a table and `---` becomes a
+// horizontal rule — `│`/`─` are plain text and survive untouched. A left gutter
+// (no right border) is intentional: emoji count as one JS char but occupy two
+// terminal cells, so any right edge would misalign — the top/bottom rules give
+// the enclosed look without that fragility.
+function boxMessage(message: string): string {
+  const lines = message.split("\n");
+  const width = Math.min(Math.max(...lines.map((l) => l.length)) + 1, 60);
+  const rule = "─".repeat(width);
+  const body = lines.map((l) => `│ ${l}`).join("\n");
+  return `┌${rule}\n${body}\n└${rule}`;
+}
+
 // Surface an informational message to the user WITHOUT changing the decision.
 // PreToolUse hook stderr is only shown in the debug log on exit 0, so we use
 // the `systemMessage` JSON channel instead, which Claude Code displays inline.
@@ -141,7 +152,7 @@ function runHook(): void {
 // suppressOutput keeps the raw JSON out of the transcript (only the rendered
 // systemMessage shows). Shared with the session-start banner for consistency.
 function emitMessage(message: string): void {
-  process.stdout.write(JSON.stringify({ systemMessage: message, suppressOutput: true }));
+  process.stdout.write(JSON.stringify({ systemMessage: boxMessage(message), suppressOutput: true }));
 }
 
 function readVersion(): string {

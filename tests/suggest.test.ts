@@ -34,7 +34,6 @@ describe("suggest — near-miss curl", () => {
     expect(s!.matcher).toBe("curl");
     expect(s!.command).toBe("anumati add curl --domain api.openai.com");
     expect(s!.configDelta).toEqual({ allowed_domains: ["api.openai.com"] });
-    expect(s!.risk).toBe("medium");
   });
 
   it("does not suggest when the domain is already allowed (would be allowed upstream)", () => {
@@ -79,30 +78,6 @@ describe("suggest — near-miss python3", () => {
   });
 });
 
-describe("suggest — python3 risk classification", () => {
-  it("rates a pure-stdlib import as low risk", () => {
-    const s = suggest(bash(`python3 -c "import statistics; print(statistics.mean([1,2]))"`), []);
-    expect(s!.risk).toBe("low");
-    expect(s!.riskReason).toBeUndefined();
-  });
-
-  it("rates a non-stdlib import as medium risk", () => {
-    const s = suggest(bash(`python3 -c "import pandas; print(pandas)"`), []);
-    expect(s!.risk).toBe("medium");
-  });
-
-  it("rates safe imports + file access as medium (python3 can touch files)", () => {
-    const s = suggest(bash(`python3 -c "import json; open('/data/x.json')"`), []);
-    expect(s!.risk).toBe("medium");
-  });
-
-  it("rates a mix of safe and unsafe imports as medium", () => {
-    // Regression: comma-import must surface numpy so it is not mistaken as safe.
-    const s = suggest(bash(`python3 -c "import json, numpy"`), []);
-    expect(s!.risk).toBe("medium");
-  });
-});
-
 describe("suggest — near-miss nodejs", () => {
   const rule: Rule = { tool: "Bash", matcher: "nodejs-pipe", allowed_modules: ["path"] };
 
@@ -129,24 +104,6 @@ describe("suggest — near-miss nodejs", () => {
   });
 });
 
-describe("suggest — nodejs risk classification", () => {
-  it("rates a pure-compute built-in as low risk", () => {
-    const s = suggest(bash(`node -e "console.log(require('path').sep)"`), []);
-    expect(s!.risk).toBe("low");
-    expect(s!.riskReason).toBeUndefined();
-  });
-
-  it("rates an unrecognized module as medium risk", () => {
-    const s = suggest(bash(`node -e "require('lodash')"`), []);
-    expect(s!.risk).toBe("medium");
-  });
-
-  it("rates code with no modules as low risk", () => {
-    const s = suggest(bash(`node -e "console.log(1+1)"`), []);
-    expect(s!.risk).toBe("low");
-  });
-});
-
 describe("suggest — near-miss pip3", () => {
   const rule: Rule = { tool: "Bash", matcher: "pip3-install", allowed_packages: ["requests"] };
 
@@ -154,7 +111,6 @@ describe("suggest — near-miss pip3", () => {
     const s = suggest(bash("pip3 install pandas -q"), [rule]);
     expect(s).not.toBeNull();
     expect(s!.command).toBe("anumati add pip3-install --packages pandas");
-    expect(s!.risk).toBe("high");
   });
 
   it("does not suggest when wildcard already present", () => {
@@ -175,7 +131,6 @@ describe("suggest — near-miss npm-script", () => {
     const s = suggest(bash("npm run lint"), [rule]);
     expect(s).not.toBeNull();
     expect(s!.command).toBe("anumati add npm-script --scripts lint");
-    expect(s!.risk).toBe("medium");
   });
 
   it("handles bare npm test", () => {
@@ -221,7 +176,6 @@ describe("suggest — new rule (no existing matcher)", () => {
     const s = suggest(bash("npm outdated"), []);
     expect(s!.matcher).toBe("npm-script");
     expect(s!.command).toBe("anumati add npm-script");
-    expect(s!.risk).toBe("low");
   });
 
   it("python3 with a fresh import", () => {
@@ -246,7 +200,6 @@ describe("suggest — new rule (no existing matcher)", () => {
     const s = suggest(bash("cargo build --release"), []);
     expect(s!.matcher).toBe("cargo");
     expect(s!.command).toBe("anumati add cargo");
-    expect(s!.risk).toBe("medium");
   });
 
   it("go command", () => {
@@ -259,7 +212,6 @@ describe("suggest — new rule (no existing matcher)", () => {
     const s = suggest(bash("git status"), []);
     expect(s!.matcher).toBe("git-read");
     expect(s!.command).toBe("anumati add git-read");
-    expect(s!.risk).toBe("low");
   });
 
   it("npx tsc --noEmit", () => {

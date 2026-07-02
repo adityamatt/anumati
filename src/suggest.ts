@@ -7,12 +7,10 @@ import {
   extractImports,
   extractOpenPaths,
   ALWAYS_BLOCKED,
-  KNOWN_SAFE_IMPORTS,
 } from "./classifiers/python3.js";
 import {
   extractModules,
   ALWAYS_BLOCKED as NODE_ALWAYS_BLOCKED,
-  KNOWN_SAFE_MODULES,
 } from "./classifiers/nodejs.js";
 import { matchCurl } from "./matchers/curl.js";
 import { matchPython3Pipe } from "./matchers/python3-pipe.js";
@@ -36,18 +34,9 @@ export interface Suggestion {
   matcher: string;
   /** The specific config fields that would need to be added/changed */
   configDelta: Record<string, unknown>;
-  /** Risk assessment */
-  risk: "low" | "medium" | "high";
-  /** Why this risk level */
-  riskReason?: string;
   /** The original command/input that triggered this */
   trigger: string;
 }
-
-// Fast lookup for risk classification of python3 import suggestions.
-const KNOWN_SAFE_SET = new Set(KNOWN_SAFE_IMPORTS);
-// Same, for nodejs module suggestions.
-const KNOWN_SAFE_MODULE_SET = new Set(KNOWN_SAFE_MODULES);
 
 /**
  * Generate a config-change suggestion for an input that fell through to the
@@ -87,7 +76,6 @@ function suggestRead(input: HookInput, allRules: Rule[]): Suggestion | null {
     description: "Auto-approve file reads (blocks path traversal)",
     matcher: "safe-read",
     configDelta: { tool: "Read", matcher: "safe-read" },
-    risk: "low",
     trigger: filePath,
   };
 }
@@ -286,8 +274,6 @@ function suggestNewRule(
     return noParamSuggestion(
       "cargo",
       "Auto-approve cargo check/build/test/clippy commands",
-      "medium",
-      "compiles and writes build artifacts locally",
       cmd,
     );
   }
@@ -295,8 +281,6 @@ function suggestNewRule(
     return noParamSuggestion(
       "go",
       "Auto-approve go build/test/vet/fmt commands",
-      "medium",
-      "compiles and writes build artifacts locally",
       cmd,
     );
   }
@@ -304,8 +288,6 @@ function suggestNewRule(
     return noParamSuggestion(
       "git-read",
       "Auto-approve read-only git commands",
-      "low",
-      undefined,
       cmd,
     );
   }
@@ -313,8 +295,6 @@ function suggestNewRule(
     return noParamSuggestion(
       "npx-tsc",
       "Auto-approve npx tsc --noEmit type checks",
-      "low",
-      undefined,
       cmd,
     );
   }
@@ -324,8 +304,6 @@ function suggestNewRule(
     return noParamSuggestion(
       "safe-inspect",
       "Auto-approve read-only inspection commands (ls/cat/grep/…)",
-      "low",
-      undefined,
       cmd,
     );
   }
@@ -340,8 +318,6 @@ function curlSuggestion(domains: string[], cmd: string): Suggestion {
     description: `Auto-approve curl to ${domains.join(", ")}`,
     matcher: "curl",
     configDelta: { allowed_domains: domains },
-    risk: "medium",
-    riskReason: "allows network requests to this domain",
     trigger: cmd,
   };
 }
@@ -352,8 +328,6 @@ function ghSuggestion(repos: string[], cmd: string): Suggestion {
     description: `Auto-approve gh api reads for ${repos.join(", ")}`,
     matcher: "gh",
     configDelta: { allowed_repos: repos },
-    risk: "medium",
-    riskReason: "allows GitHub API reads for this repo",
     trigger: cmd,
   };
 }
@@ -364,8 +338,6 @@ function pip3Suggestion(packages: string[], cmd: string): Suggestion {
     description: `Auto-approve pip install of ${packages.join(", ")}`,
     matcher: "pip3-install",
     configDelta: { allowed_packages: packages },
-    risk: "high",
-    riskReason: "pip install runs setup code and fetches from the network",
     trigger: cmd,
   };
 }
@@ -377,7 +349,6 @@ function npmScriptSuggestion(scripts: string[], cmd: string): Suggestion {
       description: "Auto-approve read-only npm/pnpm/yarn queries",
       matcher: "npm-script",
       configDelta: { matcher: "npm-script" },
-      risk: "low",
       trigger: cmd,
     };
   }
@@ -386,8 +357,6 @@ function npmScriptSuggestion(scripts: string[], cmd: string): Suggestion {
     description: `Auto-approve npm run ${scripts.join(", ")}`,
     matcher: "npm-script",
     configDelta: { allowed_scripts: scripts },
-    risk: "medium",
-    riskReason: "runs package scripts which may build or modify files",
     trigger: cmd,
   };
 }
@@ -410,19 +379,11 @@ function python3Suggestion(
   if (paths.length > 0) parts.push(`file access to ${paths.join(", ")}`);
   const what = parts.length > 0 ? ` (${parts.join("; ")})` : "";
 
-  // Low-risk only when every new import is a vetted pure-stdlib module AND the
-  // script needs no file access — otherwise python3 can touch local files.
-  const allImportsKnownSafe =
-    imports.length > 0 && imports.every((i) => KNOWN_SAFE_SET.has(i));
-  const lowRisk = paths.length === 0 && allImportsKnownSafe;
-
   return {
     command: `anumati add python3-pipe${flags.length ? " " + flags.join(" ") : ""}`,
     description: `Auto-approve python3${what}`,
     matcher: "python3-pipe",
     configDelta,
-    risk: lowRisk ? "low" : "medium",
-    riskReason: lowRisk ? undefined : "python3 can read and write local files",
     trigger: cmd,
   };
 }
@@ -434,19 +395,11 @@ function nodejsSuggestion(modules: string[], cmd: string): Suggestion {
   const what = modules.length > 0 ? ` (modules ${modules.join(", ")})` : "";
   const flag = modules.length > 0 ? ` --modules ${modules.join(",")}` : "";
 
-  // Low-risk only when every module is a vetted pure-compute built-in. node
-  // scripts can't touch the filesystem (fs is always blocked), but a non-stdlib
-  // or unrecognized module still warrants a second look.
-  const lowRisk =
-    modules.length === 0 || modules.every((m) => KNOWN_SAFE_MODULE_SET.has(m));
-
   return {
     command: `anumati add nodejs-pipe${flag}`,
     description: `Auto-approve node${what}`,
     matcher: "nodejs-pipe",
     configDelta,
-    risk: lowRisk ? "low" : "medium",
-    riskReason: lowRisk ? undefined : "node can load third-party or unrecognized modules",
     trigger: cmd,
   };
 }
@@ -454,8 +407,6 @@ function nodejsSuggestion(modules: string[], cmd: string): Suggestion {
 function noParamSuggestion(
   matcher: string,
   description: string,
-  risk: Suggestion["risk"],
-  riskReason: string | undefined,
   cmd: string,
 ): Suggestion {
   return {
@@ -463,8 +414,6 @@ function noParamSuggestion(
     description,
     matcher,
     configDelta: { matcher },
-    risk,
-    riskReason,
     trigger: cmd,
   };
 }

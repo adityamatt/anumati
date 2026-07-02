@@ -14,8 +14,6 @@ const SAMPLE: Suggestion = {
   description: "Auto-approve curl to example.com",
   matcher: "curl",
   configDelta: { allowed_domains: ["example.com"] },
-  risk: "medium",
-  riskReason: "network",
   trigger: "curl https://example.com",
 };
 
