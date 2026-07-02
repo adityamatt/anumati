@@ -43,6 +43,26 @@ describe("classify — dangerous", () => {
   }
 });
 
+describe("classify — nodejs", () => {
+  it("classifies node -e as nodejs-e", () => {
+    expect(classify(`node -e "console.log(1)"`).kind).toBe("nodejs-e");
+  });
+  it("classifies node --eval as nodejs-e", () => {
+    expect(classify(`node --eval "1+1"`).kind).toBe("nodejs-e");
+  });
+  it("classifies node -p / --print as nodejs-e", () => {
+    expect(classify(`node -p "1+1"`).kind).toBe("nodejs-e");
+    expect(classify(`node --print "1+1"`).kind).toBe("nodejs-e");
+  });
+  it("classifies node script.js as nodejs-script", () => {
+    expect(classify("node script.js").kind).toBe("nodejs-script");
+  });
+  it("classifies bare/flagged node as dangerous", () => {
+    expect(classify("node").kind).toBe("dangerous");
+    expect(classify("node --inspect app.js").kind).toBe("dangerous");
+  });
+});
+
 describe("classify — unknown", () => {
   it("classifies unknown command", () => {
     expect(classify("my-custom-tool --flag").kind).toBe("unknown");

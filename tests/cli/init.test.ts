@@ -134,6 +134,17 @@ describe("applyInit", () => {
     expect(existsSync(nested)).toBe(true);
   });
 
+  it("seeds a nodejs-pipe rule that auto-approves pure-compute node", () => {
+    applyInit({ config: configPath });
+    const rules = read().allow ?? [];
+    const input: HookInput = {
+      session_id: "t",
+      tool_name: "Bash",
+      tool_input: { command: `node -e "console.log(require('path').sep)"` },
+    };
+    expect(evaluate(input, rules).decision).toBe("allow");
+  });
+
   it("refuses to overwrite an existing config without --force", () => {
     writeFileSync(configPath, JSON.stringify({ allow: [{ matcher: "cargo" }] }));
     expect(() => applyInit({ config: configPath })).toThrow(/already exists/);

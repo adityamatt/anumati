@@ -5,6 +5,7 @@ import { createInterface } from "readline/promises";
 import type { Config, Rule } from "../types.js";
 import { defaultConfigPath, projectConfigPath } from "../config.js";
 import { KNOWN_SAFE_IMPORTS } from "../classifiers/python3.js";
+import { KNOWN_SAFE_MODULES } from "../classifiers/nodejs.js";
 import {
   settingsFileFor,
   buildHookCommand,
@@ -30,6 +31,12 @@ export const STARTER_RULES: Rule[] = [
     matcher: "python3-pipe",
     allowed_imports: [...KNOWN_SAFE_IMPORTS],
     desc: "python3 using pure-stdlib modules (no file/network/exec)",
+  },
+  {
+    tool: "Bash",
+    matcher: "nodejs-pipe",
+    allowed_modules: [...KNOWN_SAFE_MODULES],
+    desc: "node using pure-compute built-in modules (no fs/network/child_process)",
   },
 ];
 

@@ -9,8 +9,14 @@ import {
   ALWAYS_BLOCKED,
   KNOWN_SAFE_IMPORTS,
 } from "./classifiers/python3.js";
+import {
+  extractModules,
+  ALWAYS_BLOCKED as NODE_ALWAYS_BLOCKED,
+  KNOWN_SAFE_MODULES,
+} from "./classifiers/nodejs.js";
 import { matchCurl } from "./matchers/curl.js";
 import { matchPython3Pipe } from "./matchers/python3-pipe.js";
+import { matchNodejsPipe } from "./matchers/nodejs-pipe.js";
 import { matchPip3Install } from "./matchers/pip3-install.js";
 import { matchNpmScript } from "./matchers/npm-script.js";
 import { matchGh } from "./matchers/gh.js";
@@ -40,6 +46,8 @@ export interface Suggestion {
 
 // Fast lookup for risk classification of python3 import suggestions.
 const KNOWN_SAFE_SET = new Set(KNOWN_SAFE_IMPORTS);
+// Same, for nodejs module suggestions.
+const KNOWN_SAFE_MODULE_SET = new Set(KNOWN_SAFE_MODULES);
 
 /**
  * Generate a config-change suggestion for an input that fell through to the
@@ -103,6 +111,9 @@ function findNearMiss(
       case "python3-pipe":
         miss = nearMissPython3(cmd, rule, cwd);
         break;
+      case "nodejs-pipe":
+        miss = nearMissNodejs(cmd, rule, cwd);
+        break;
       case "pip3-install":
         miss = nearMissPip3(cmd, rule);
         break;
@@ -156,6 +167,21 @@ function nearMissPython3(cmd: string, rule: Rule, cwd: string): Suggestion | nul
   if (!matchPython3Pipe(cmd, candImports, candPaths, cwd)) return null;
 
   return python3Suggestion(delta.imports, delta.paths, cmd);
+}
+
+function nearMissNodejs(cmd: string, rule: Rule, cwd: string): Suggestion | null {
+  const codes = nodejsCodes(cmd, cwd);
+  if (!codes) return null;
+
+  const allowedModules = rule.allowed_modules ?? [];
+  const missing = nodejsDelta(codes, allowedModules);
+  if (!missing) return null; // blocked/dynamic module — never approvable
+  if (missing.length === 0) return null;
+
+  const candidate = unique([...allowedModules, ...missing]);
+  if (!matchNodejsPipe(cmd, candidate, cwd)) return null;
+
+  return nodejsSuggestion(missing, cmd);
 }
 
 function nearMissPip3(cmd: string, rule: Rule): Suggestion | null {
@@ -244,6 +270,15 @@ function suggestNewRule(
       const delta = python3Delta(codes, [], []);
       if (delta && matchPython3Pipe(cmd, delta.imports, delta.paths, cwd)) {
         return python3Suggestion(delta.imports, delta.paths, cmd);
+      }
+    }
+  }
+  if (!has("nodejs-pipe")) {
+    const codes = nodejsCodes(cmd, cwd);
+    if (codes) {
+      const modules = nodejsDelta(codes, []);
+      if (modules && matchNodejsPipe(cmd, modules, cwd)) {
+        return nodejsSuggestion(modules, cmd);
       }
     }
   }
@@ -388,6 +423,30 @@ function python3Suggestion(
     configDelta,
     risk: lowRisk ? "low" : "medium",
     riskReason: lowRisk ? undefined : "python3 can read and write local files",
+    trigger: cmd,
+  };
+}
+
+function nodejsSuggestion(modules: string[], cmd: string): Suggestion {
+  const configDelta: Record<string, unknown> = {};
+  if (modules.length > 0) configDelta.allowed_modules = modules;
+
+  const what = modules.length > 0 ? ` (modules ${modules.join(", ")})` : "";
+  const flag = modules.length > 0 ? ` --modules ${modules.join(",")}` : "";
+
+  // Low-risk only when every module is a vetted pure-compute built-in. node
+  // scripts can't touch the filesystem (fs is always blocked), but a non-stdlib
+  // or unrecognized module still warrants a second look.
+  const lowRisk =
+    modules.length === 0 || modules.every((m) => KNOWN_SAFE_MODULE_SET.has(m));
+
+  return {
+    command: `anumati add nodejs-pipe${flag}`,
+    description: `Auto-approve node${what}`,
+    matcher: "nodejs-pipe",
+    configDelta,
+    risk: lowRisk ? "low" : "medium",
+    riskReason: lowRisk ? undefined : "node can load third-party or unrecognized modules",
     trigger: cmd,
   };
 }
@@ -576,6 +635,48 @@ function python3Codes(cmd: string, cwd: string): string[] | null {
     }
   }
   return sawPython ? codes : null;
+}
+
+/**
+ * Compute the modules that would need allowing for the given node code blocks.
+ * Returns null when the command can never be safely approved (an ALWAYS_BLOCKED
+ * module, or a dynamic/aliased require/import that can't be verified).
+ */
+function nodejsDelta(codes: string[], allowedModules: string[]): string[] | null {
+  const modules = new Set<string>();
+  for (const code of codes) {
+    const mods = extractModules(code);
+    if (mods === null) return null; // dynamic/aliased require or import
+    for (const raw of mods) {
+      const mod = raw.startsWith("node:") ? raw.slice(5) : raw;
+      if (NODE_ALWAYS_BLOCKED.has(mod)) return null;
+      if (!allowedModules.includes(mod)) modules.add(mod);
+    }
+  }
+  return [...modules];
+}
+
+function nodejsCodes(cmd: string, cwd: string): string[] | null {
+  const segments = parseCompound(cmd);
+  if (!segments) return null;
+  const codes: string[] = [];
+  let sawNode = false;
+  for (const seg of segments) {
+    const c = classify(seg.raw);
+    if (c.kind === "nodejs-e") {
+      sawNode = true;
+      const idx = c.argv.findIndex((a) => a === "-e" || a === "--eval" || a === "-p" || a === "--print");
+      codes.push(idx !== -1 ? (c.argv[idx + 1] ?? "") : "");
+    } else if (c.kind === "nodejs-script") {
+      sawNode = true;
+      try {
+        codes.push(readFileSync(resolve(cwd, c.argv[1]), "utf-8"));
+      } catch {
+        return null; // can't read the script — can't suggest
+      }
+    }
+  }
+  return sawNode ? codes : null;
 }
 
 // For an open() path, suggest its directory (broadest useful prefix), unless

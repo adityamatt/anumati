@@ -39,7 +39,7 @@ anumati init
 
 `anumati init` prompts whether to set up a **project** config (this folder) or a **root** config (global, applies everywhere), shows which already exist, and then:
 
-1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-read`, `safe-inspect`, `git-read`, `npx-tsc`, plus a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …). Those modules have no file, network, or code-execution entry points, and any `open()` in your script is still path-checked — so blessing them doesn't widen file access. (Libraries with I/O side channels like `numpy`/`pandas` are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
+1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-read`, `safe-inspect`, `git-read`, `npx-tsc`, a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …), and a `nodejs-pipe` rule pre-allowing the equivalent set of **pure-compute** Node built-ins (`path`, `crypto`, `url`, `util`, `buffer`, `zlib`, …). Those modules have no file, network, or code-execution entry points. For python3 any `open()` in your script is still path-checked; for node the filesystem module `fs` (along with `child_process`/`net`/`http`/`os`/`vm`) is blocked outright — so blessing these doesn't widen file or network access. (Libraries with I/O side channels like `numpy`/`pandas`, and any npm package, are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
 2. **Scaffolds an audit log** (`anumati-audit.jsonl`) next to the config.
 3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
 4. **Adds a SessionStart banner** — a `⚡ anumati active — N rules` message shown at the start of each session so you can see at a glance that anumati is wired up.
@@ -103,6 +103,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `matcher` | all | Named matcher (see table below) — required; there is no regex fallback |
 | `allowed_domains` | `curl` | Hostnames allowed as `https://` curl targets |
 | `allowed_imports` | `python3-pipe` | Python modules the code may import |
+| `allowed_modules` | `nodejs-pipe` | Node built-in modules the code may `require`/`import` |
 | `allowed_packages` | `pip3-install` | Packages `pip install` may install (`"*"` = any) |
 | `allowed_scripts` | `npm-script` | `npm/pnpm/yarn run <script>` names (`"*"` = any) |
 | `allowed_repos` | `gh` | `owner/repo` slugs allowed for `gh api repos/...` reads |
@@ -117,6 +118,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `curl` | Bash | allow `curl` to specific https domains (+ pipe to safe builtins) | `allowed_domains` |
 | `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` | `allowed_repos` |
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins | `allowed_imports`, `open.allowed_paths` |
+| `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules, no `fs`/network/`child_process`/`eval` | `allowed_modules` |
 | `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create) | `allowed_packages` |
 | `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries | `allowed_scripts` |
 | `cargo` | Bash | allow `cargo check/build/test/clippy/fmt --check/tree/…` | — |
@@ -184,12 +186,13 @@ Apply a suggestion (or write a rule directly). Creates the config file if it doe
 ```bash
 anumati add curl --domain api.openai.com
 anumati add python3-pipe --imports pandas,numpy
+anumati add nodejs-pipe --modules os,fs
 anumati add pip3-install --packages flask
 anumati add cargo
 anumati add safe-read
 ```
 
-Flags: `--domain`/`--domains`, `--imports`, `--packages`, `--scripts`, `--repos`, `--paths` (comma-separated or repeated). Targets `~/.claude/permissions.json` by default; override with `--config <path>`.
+Flags: `--domain`/`--domains`, `--imports`, `--modules`, `--packages`, `--scripts`, `--repos`, `--paths` (comma-separated or repeated). Targets `~/.claude/permissions.json` by default; override with `--config <path>`.
 
 ### `anumati apply`
 

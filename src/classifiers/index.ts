@@ -45,6 +45,18 @@ export function classify(raw: string): ClassifiedCommand {
     }
     return { kind: "dangerous", argv, raw };
   }
+  if (cmd === "node") {
+    // Inline eval: -e/--eval "code" (also -p/--print, which evals then prints).
+    const evalIdx = argv.findIndex((a) => a === "-e" || a === "--eval" || a === "-p" || a === "--print");
+    if (evalIdx !== -1 && argv[evalIdx + 1] !== undefined) {
+      return { kind: "nodejs-e", argv, raw };
+    }
+    // script file: node script.js (the sole non-flag arg)
+    if (argv.length === 2 && !argv[1].startsWith("-")) {
+      return { kind: "nodejs-script", argv, raw };
+    }
+    return { kind: "dangerous", argv, raw };
+  }
   if (DANGEROUS_COMMANDS.has(cmd)) return { kind: "dangerous", argv, raw };
   if (cmd === "curl") return { kind: "curl", argv, raw };
   if (cmd === "git") return { kind: "git", argv, raw };

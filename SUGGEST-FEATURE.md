@@ -63,6 +63,7 @@ For each rule in the config, check if the command would have matched if the rule
 | `curl`         | Command is `curl https://X` and X is not in `allowed_domains`                                          | "Add `X` to allowed_domains"         |
 | `python3-pipe` | Command is `python3 -c "import foo"` and `foo` not in `allowed_imports` but also not in ALWAYS_BLOCKED | "Add `foo` to allowed_imports"       |
 | `python3-pipe` | Script uses `open("/path/...")` and path not in `open.allowed_paths`                                   | "Add `/path/` to open.allowed_paths" |
+| `nodejs-pipe`  | Command is `node -e "require('foo')"` and `foo` not in `allowed_modules` but also not in ALWAYS_BLOCKED | "Add `foo` to allowed_modules"       |
 | `pip3-install` | Command is `pip3 install X` and X not in `allowed_packages`                                            | "Add `X` to allowed_packages"        |
 | `npm-script`   | Command is `npm run X` and X not in `allowed_scripts`                                                  | "Add `X` to allowed_scripts"         |
 | `gh`           | Command is `gh api repos/owner/repo/...` and repo not in `allowed_repos`                               | "Add `owner/repo` to allowed_repos"  |
@@ -75,6 +76,7 @@ If no near-miss was found, classify the command and suggest adding a new rule en
 | ------------------------------------ | ------------------------------------------------------- |
 | `curl` (to domain X)                 | `anumati add curl --domain X`                           |
 | `python3-c` or `python3-script`      | `anumati add python3-pipe --imports <detected imports>` |
+| `nodejs-e` or `nodejs-script`        | `anumati add nodejs-pipe --modules <detected modules>`  |
 | `git` (read-only subcommand)         | `anumati add git-read`                                  |
 | `safe-builtin` (ls, cat, grep, etc.) | `anumati add safe-inspect`                              |
 | Tool is `Read`                       | `anumati add safe-read`                                 |
