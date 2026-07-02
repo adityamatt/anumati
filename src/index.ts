@@ -18,6 +18,7 @@ import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
 import { runApply } from "./cli/apply.js";
 import { runDebug } from "./cli/debug.js";
+import { runSessionStart } from "./cli/session-start.js";
 import type {
   Config,
   HookInput,
@@ -136,9 +137,11 @@ function runHook(): void {
 // Surface an informational message to the user WITHOUT changing the decision.
 // PreToolUse hook stderr is only shown in the debug log on exit 0, so we use
 // the `systemMessage` JSON channel instead, which Claude Code displays inline.
-// Omitting permissionDecision keeps the call on its normal passthrough path.
+// Omitting permissionDecision keeps the call on its normal passthrough path;
+// suppressOutput keeps the raw JSON out of the transcript (only the rendered
+// systemMessage shows). Shared with the session-start banner for consistency.
 function emitMessage(message: string): void {
-  process.stdout.write(JSON.stringify({ systemMessage: message }));
+  process.stdout.write(JSON.stringify({ systemMessage: message, suppressOutput: true }));
 }
 
 function readVersion(): string {
@@ -160,8 +163,9 @@ Usage:
                                    config-path defaults to ~/.claude/permissions.json.
   anumati init [--root|--project]  Create a starter config with safe default rules.
                                    Prompts for the level if not specified; --force to overwrite.
-                                   Also scaffolds an audit log and registers the PreToolUse
-                                   hook in settings.json (--no-audit / --no-hook to skip;
+                                   Also scaffolds an audit log, registers the PreToolUse hook,
+                                   and adds a SessionStart "⚡ anumati active" banner
+                                   (--no-audit / --no-hook / --no-banner to skip;
                                    --debug to start with debug mode on).
   anumati add <matcher> [flags]    Add or extend an allow rule in a config.
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
@@ -204,6 +208,21 @@ function main(): void {
   }
   if (subcommand === "debug") {
     runDebug(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "session-start") {
+    // The SessionStart hook pipes JSON (with the real cwd) on stdin. Read it
+    // when piped; fall back to process.cwd() when run interactively.
+    let cwd = process.cwd();
+    if (!process.stdin.isTTY) {
+      try {
+        const parsed = JSON.parse(readStdin()) as { cwd?: string };
+        if (parsed.cwd) cwd = parsed.cwd;
+      } catch {
+        // no/invalid stdin → use process.cwd()
+      }
+    }
+    runSessionStart(process.argv.slice(2), cwd);
     return;
   }
   if (subcommand === "--help" || subcommand === "-h") {

@@ -15,6 +15,7 @@ export interface HookEntry {
 export interface ClaudeSettings {
   hooks?: {
     PreToolUse?: HookEntry[];
+    SessionStart?: HookEntry[];
     [event: string]: unknown;
   };
   [key: string]: unknown;
@@ -23,6 +24,9 @@ export interface ClaudeSettings {
 // Tools anumati evaluates. Matches the wiring documented in the README.
 export const HOOK_MATCHER = "Bash|Read|Write|Edit";
 export const HOOK_TIMEOUT = 5;
+// SessionStart banner runs once at session start; a slightly longer timeout is
+// harmless and avoids racing a cold Node start.
+export const BANNER_TIMEOUT = 5;
 
 /** settings.json lives alongside permissions.json (same .claude/ directory). */
 export function settingsFileFor(configPath: string): string {
@@ -50,6 +54,21 @@ export function buildHookCommand(
   const cfg = shellQuote(configPath);
   if (basename(argv1) === "anumati") return `anumati ${cfg}`;
   return `${shellQuote(execPath)} ${shellQuote(argv1)} ${cfg}`;
+}
+
+/**
+ * Build the SessionStart banner command — the same launcher as buildHookCommand
+ * but invoking the `session-start` subcommand, with the config passed as the
+ * arg after it so the banner describes the right config.
+ */
+export function buildBannerCommand(
+  configPath: string,
+  argv1: string,
+  execPath: string,
+): string {
+  const cfg = shellQuote(configPath);
+  if (basename(argv1) === "anumati") return `anumati session-start ${cfg}`;
+  return `${shellQuote(execPath)} ${shellQuote(argv1)} session-start ${cfg}`;
 }
 
 /** Read settings.json. Missing → {}. Present-but-invalid → throw (never clobber). */
@@ -100,14 +119,61 @@ export interface WireResult {
   changed: boolean; // false when an anumati hook was already present
 }
 
-/** Merge the anumati hook into the settings file at `settingsPath`. */
-export function wireAnumatiHook(settingsPath: string, command: string): WireResult {
+function hasAnumatiBanner(settings: ClaudeSettings): boolean {
+  const entries = settings.hooks?.SessionStart ?? [];
+  return entries.some((e) =>
+    (e.hooks ?? []).some(
+      (h) => typeof h.command === "string" && h.command.includes("session-start"),
+    ),
+  );
+}
+
+/**
+ * Return a copy of `settings` with an anumati SessionStart banner hook added.
+ * Idempotent and non-destructive, mirroring mergeAnumatiHook. SessionStart hooks
+ * take no matcher (they fire on every session start).
+ */
+export function mergeAnumatiBanner(
+  settings: ClaudeSettings,
+  command: string,
+): { settings: ClaudeSettings; changed: boolean } {
+  if (hasAnumatiBanner(settings)) return { settings, changed: false };
+
+  const next: ClaudeSettings = { ...settings, hooks: { ...(settings.hooks ?? {}) } };
+  const sessionStart = [...((next.hooks!.SessionStart as HookEntry[] | undefined) ?? [])];
+  sessionStart.push({
+    hooks: [{ type: "command", command, timeout: BANNER_TIMEOUT }],
+  });
+  next.hooks!.SessionStart = sessionStart;
+  return { settings: next, changed: true };
+}
+
+/**
+ * Merge both the PreToolUse hook and (when bannerCommand is given) the
+ * SessionStart banner into the settings file, in a single read/write. Reading
+ * once avoids a torn state where the first write invalidates the second's read.
+ */
+export function wireAnumatiHook(
+  settingsPath: string,
+  command: string,
+  bannerCommand?: string,
+): WireResult {
   const existing = loadSettings(settingsPath);
-  const { settings, changed } = mergeAnumatiHook(existing, command);
-  if (changed) {
+  const hookMerge = mergeAnumatiHook(existing, command);
+  let settings = hookMerge.settings;
+  let changed = hookMerge.changed;
+
+  let bannerChanged = false;
+  if (bannerCommand) {
+    const bannerMerge = mergeAnumatiBanner(settings, bannerCommand);
+    settings = bannerMerge.settings;
+    bannerChanged = bannerMerge.changed;
+  }
+
+  if (changed || bannerChanged) {
     const dir = dirname(settingsPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   }
-  return { settingsPath, command, changed };
+  return { settingsPath, command, changed: changed || bannerChanged };
 }

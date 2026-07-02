@@ -245,6 +245,18 @@ describe("cli — init", () => {
     const cmd = settings.hooks.PreToolUse[0].hooks[0].command;
     expect(cmd).toContain("index.js");
     expect(cmd).toContain(configPath);
+
+    // …and a SessionStart banner hook should also be registered.
+    const bannerCmd = settings.hooks.SessionStart[0].hooks[0].command;
+    expect(bannerCmd).toContain("session-start");
+    expect(bannerCmd).toContain(configPath);
+  });
+
+  it("--no-banner skips the SessionStart hook (but keeps PreToolUse)", () => {
+    run(["init", "--config", configPath, "--no-banner"]);
+    const settings = JSON.parse(readFileSync(join(dir, "settings.json"), "utf-8"));
+    expect(settings.hooks.PreToolUse).toBeDefined();
+    expect(settings.hooks.SessionStart).toBeUndefined();
   });
 
   it("merges into existing settings.json without clobbering other hooks", () => {
@@ -298,6 +310,46 @@ describe("cli — init", () => {
     expect(res.status).toBe(1);
     expect(res.stderr).toContain("--root");
     expect(res.stderr).toContain("--project");
+  });
+});
+
+describe("cli — session-start banner", () => {
+  it("emits an ⚡ anumati banner via systemMessage for a configured directory", () => {
+    writeFileSync(configPath, JSON.stringify({ allow: [{ tool: "Bash", matcher: "git-read" }] }));
+    // SessionStart hook receives JSON with cwd on stdin; config passed as argv.
+    const res = run(["session-start", configPath], {
+      session_id: "s",
+      hook_event_name: "SessionStart",
+      source: "startup",
+      cwd: dir,
+    });
+    const msg = systemMessage(res.stdout);
+    expect(msg).toContain("⚡ anumati active");
+    expect(msg).toContain("1 rule");
+    // The config path is included (absolute) so the terminal can link it.
+    expect(msg).toContain(configPath);
+  });
+
+  it("reflects debug state in the banner", () => {
+    writeFileSync(
+      configPath,
+      JSON.stringify({ suggest: { debug: true }, allow: [{ matcher: "git-read" }] }),
+    );
+    const res = run(["session-start", configPath], { cwd: dir });
+    expect(systemMessage(res.stdout)).toContain("debug on");
+  });
+
+  it("stays silent (no output) when the config has no rules", () => {
+    writeFileSync(configPath, JSON.stringify({ allow: [] }));
+    const res = run(["session-start", configPath], { cwd: dir });
+    expect(res.stdout).toBe("");
+    expect(res.status).toBe(0);
+  });
+
+  it("stays silent when the config is missing (never disrupts startup)", () => {
+    const res = run(["session-start", join(dir, "missing.json")], { cwd: dir });
+    expect(res.stdout).toBe("");
+    expect(res.status).toBe(0);
   });
 });
 
