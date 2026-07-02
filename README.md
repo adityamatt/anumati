@@ -42,8 +42,9 @@ anumati init
 1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-read`, `safe-inspect`, `git-read`, `npx-tsc`, plus a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …). Those modules have no file, network, or code-execution entry points, and any `open()` in your script is still path-checked — so blessing them doesn't widen file access. (Libraries with I/O side channels like `numpy`/`pandas` are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
 2. **Scaffolds an audit log** (`anumati-audit.jsonl`) next to the config.
 3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
+4. **Adds a SessionStart banner** — a `⚡ anumati active — N rules` message shown at the start of each session so you can see at a glance that anumati is wired up.
 
-Pass `--project` / `--root` to skip the prompt, `--force` to overwrite an existing config, and `--no-audit` / `--no-hook` to skip those steps. Add more rules as you go with `anumati add` (see below).
+Pass `--project` / `--root` to skip the prompt, `--force` to overwrite an existing config, and `--no-audit` / `--no-hook` / `--no-banner` to skip those steps. Add more rules as you go with `anumati add` (see below).
 
 ---
 
@@ -160,10 +161,21 @@ anumati init --root      # write ~/.claude/permissions.json (skip prompt)
 anumati init --force     # overwrite an existing config
 anumati init --no-audit  # don't scaffold the audit log
 anumati init --no-hook   # don't register the hook in settings.json
+anumati init --no-banner # don't add the SessionStart "⚡ anumati active" banner
 anumati init --debug     # start with debug mode on (explains passthroughs)
 ```
 
-Shows which configs already exist, then writes the chosen config, an empty `anumati-audit.jsonl`, and a PreToolUse hook in the `settings.json` beside it. The hook is merged into existing settings (other hooks preserved) and is idempotent. Refuses to overwrite an existing config unless `--force` is given; an existing audit log is never clobbered, and if `settings.json` is invalid JSON the hook step is skipped with a warning (the config is still written). **Restart Claude Code after init for the hook to load.**
+Shows which configs already exist, then writes the chosen config, an empty `anumati-audit.jsonl`, a PreToolUse hook, and a SessionStart banner in the `settings.json` beside it. Hooks are merged into existing settings (other hooks preserved) and are idempotent. Refuses to overwrite an existing config unless `--force` is given; an existing audit log is never clobbered, and if `settings.json` is invalid JSON the hook step is skipped with a warning (the config is still written). **Restart Claude Code after init for the hooks to load.**
+
+### The startup banner
+
+Once wired, each new (or resumed) session shows a one-line banner so you know anumati is active:
+
+```
+⚡ anumati active — 5 rules, debug on
+```
+
+It reports the rule count and whether debug mode is on. It's surfaced via the SessionStart hook's `systemMessage`, stays silent if the config has no rules, and never disrupts startup. Skip it with `anumati init --no-banner`.
 
 ### `anumati add`
 

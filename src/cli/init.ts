@@ -8,6 +8,7 @@ import { KNOWN_SAFE_IMPORTS } from "../classifiers/python3.js";
 import {
   settingsFileFor,
   buildHookCommand,
+  buildBannerCommand,
   wireAnumatiHook,
   type WireResult,
 } from "./settings.js";
@@ -61,6 +62,7 @@ export interface InitOptions {
   force?: boolean;
   audit?: boolean; // scaffold an audit block + log file (default: true)
   hook?: boolean; // register the PreToolUse hook in settings.json (default: true)
+  banner?: boolean; // register the SessionStart "anumati active" banner (default: true)
   debug?: boolean; // seed suggest.debug in the starter config (default: false)
   // How anumati was launched — used to build the hook command. Injected for
   // testability; default to the real process values in runInit().
@@ -142,13 +144,16 @@ export function applyInit(opts: InitOptions & { config: string }): InitResult {
   let hook: WireResult | undefined;
   let hookError: string | undefined;
   if (opts.hook !== false) {
-    const command = buildHookCommand(
-      configPath,
-      opts.argv1 ?? process.argv[1] ?? "anumati",
-      opts.execPath ?? process.execPath,
-    );
+    const argv1 = opts.argv1 ?? process.argv[1] ?? "anumati";
+    const execPath = opts.execPath ?? process.execPath;
+    const command = buildHookCommand(configPath, argv1, execPath);
+    // Also register the SessionStart banner unless opted out.
+    const bannerCommand =
+      opts.banner !== false
+        ? buildBannerCommand(configPath, argv1, execPath)
+        : undefined;
     try {
-      hook = wireAnumatiHook(settingsFileFor(configPath), command);
+      hook = wireAnumatiHook(settingsFileFor(configPath), command, bannerCommand);
     } catch (err) {
       hookError = (err as Error).message;
     }
@@ -171,6 +176,8 @@ export function parseInitArgs(args: string[]): InitOptions {
       opts.audit = false;
     } else if (arg === "--no-hook") {
       opts.hook = false;
+    } else if (arg === "--no-banner") {
+      opts.banner = false;
     } else if (arg === "--debug") {
       opts.debug = true;
     } else if (arg === "--config") {

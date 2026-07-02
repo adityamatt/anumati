@@ -6,8 +6,10 @@ import {
   settingsFileFor,
   shellQuote,
   buildHookCommand,
+  buildBannerCommand,
   loadSettings,
   mergeAnumatiHook,
+  mergeAnumatiBanner,
   wireAnumatiHook,
   HOOK_MATCHER,
   type ClaudeSettings,
@@ -57,6 +59,42 @@ describe("buildHookCommand", () => {
   it("quotes a config path containing spaces", () => {
     const cmd = buildHookCommand("/my dir/permissions.json", "/x/anumati", "/usr/bin/node");
     expect(cmd).toBe('anumati "/my dir/permissions.json"');
+  });
+});
+
+describe("buildBannerCommand", () => {
+  it("uses the bare bin form with the session-start subcommand", () => {
+    const cmd = buildBannerCommand("/c/permissions.json", "/usr/local/bin/anumati", "/usr/bin/node");
+    expect(cmd).toBe("anumati session-start /c/permissions.json");
+  });
+
+  it("pins node + script + session-start when launched via node dist/index.js", () => {
+    const cmd = buildBannerCommand("/c/permissions.json", "/repo/dist/index.js", "/usr/bin/node");
+    expect(cmd).toBe("/usr/bin/node /repo/dist/index.js session-start /c/permissions.json");
+  });
+});
+
+describe("mergeAnumatiBanner", () => {
+  it("adds a SessionStart hook (no matcher) to empty settings", () => {
+    const { settings, changed } = mergeAnumatiBanner({}, "anumati session-start /c.json");
+    expect(changed).toBe(true);
+    const entry = settings.hooks!.SessionStart![0];
+    expect(entry.matcher).toBeUndefined();
+    expect(entry.hooks[0].command).toBe("anumati session-start /c.json");
+  });
+
+  it("is idempotent when a session-start hook already exists", () => {
+    const first = mergeAnumatiBanner({}, "anumati session-start /c.json").settings;
+    expect(mergeAnumatiBanner(first, "anumati session-start /c.json").changed).toBe(false);
+  });
+
+  it("preserves other SessionStart hooks", () => {
+    const existing: ClaudeSettings = {
+      hooks: { SessionStart: [{ hooks: [{ type: "command", command: "other-startup" }] }] },
+    };
+    const { settings } = mergeAnumatiBanner(existing, "anumati session-start /c.json");
+    expect(settings.hooks!.SessionStart).toHaveLength(2);
+    expect(settings.hooks!.SessionStart![0].hooks[0].command).toBe("other-startup");
   });
 });
 
@@ -123,5 +161,27 @@ describe("wireAnumatiHook", () => {
     writeFileSync(settingsPath, "{ broken");
     expect(() => wireAnumatiHook(settingsPath, "anumati /c.json")).toThrow(/not valid JSON/);
     expect(readFileSync(settingsPath, "utf-8")).toBe("{ broken");
+  });
+
+  it("registers both PreToolUse and SessionStart when a banner command is given", () => {
+    const res = wireAnumatiHook(settingsPath, "anumati /c.json", "anumati session-start /c.json");
+    expect(res.changed).toBe(true);
+    const s = read();
+    expect(s.hooks!.PreToolUse![0].hooks[0].command).toBe("anumati /c.json");
+    expect(s.hooks!.SessionStart![0].hooks[0].command).toBe("anumati session-start /c.json");
+  });
+
+  it("adds only the banner when the PreToolUse hook already exists", () => {
+    wireAnumatiHook(settingsPath, "anumati /c.json"); // hook only, no banner
+    const res = wireAnumatiHook(settingsPath, "anumati /c.json", "anumati session-start /c.json");
+    expect(res.changed).toBe(true); // banner was newly added
+    expect(read().hooks!.SessionStart).toHaveLength(1);
+    expect(read().hooks!.PreToolUse).toHaveLength(1); // not duplicated
+  });
+
+  it("is fully idempotent when both already exist", () => {
+    wireAnumatiHook(settingsPath, "anumati /c.json", "anumati session-start /c.json");
+    const res = wireAnumatiHook(settingsPath, "anumati /c.json", "anumati session-start /c.json");
+    expect(res.changed).toBe(false);
   });
 });

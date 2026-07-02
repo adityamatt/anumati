@@ -53,6 +53,8 @@ interface Config {
 
 PreToolUse hook **stderr is invisible in the UI on exit 0** (debug-log only). To show 💡 suggestions and 🔍 debug notes, the hook writes `{"systemMessage": "…"}` to **stdout** and omits `permissionDecision` — Claude Code displays the message while the call stays on its normal passthrough path. See `emitMessage()` in `src/index.ts`. An allow still emits `hookSpecificOutput.permissionDecision = "allow"` as before.
 
+**SessionStart banner.** `anumati session-start [config]` (src/cli/session-start.ts) runs as a SessionStart hook and prints `{"systemMessage":"⚡ anumati active — N rules[, debug on]"}`. Note: for SessionStart, plain stdout is added to *Claude's context*, not shown to the user — so the banner MUST use `systemMessage` (not bare stdout). It stays silent (no output) when the config is missing or has no rules, and never throws. `anumati init` registers it (src/cli/settings.ts `buildBannerCommand`/`mergeAnumatiBanner`), skippable with `--no-banner`.
+
 ## Shell parser invariants
 
 - `parseCompound()` returns `null` for: dangerous chars (`` ` `` `$`), unclosed quotes
