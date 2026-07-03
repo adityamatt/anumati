@@ -1,5 +1,6 @@
 import type { HookInput } from "./types.js";
 import { parseCompound, tokenize } from "./parser/shell.js";
+import { hasUnsafeRedirection } from "./parser/redirect.js";
 import { classify } from "./classifiers/index.js";
 
 /**
@@ -21,7 +22,6 @@ export interface DebugNote {
 // accepted by any matcher, so they are always worth calling out.
 const NEVER_ACCEPTED_OPS = new Set([";", "||", "&"]);
 
-const REDIRECT_RE = /[<>]/;
 const SUBSTITUTION_RE = /[`$]/;
 
 export function debugDiagnose(input: HookInput): DebugNote | null {
@@ -70,12 +70,14 @@ export function debugDiagnose(input: HookInput): DebugNote | null {
     };
   }
 
-  // 3. Redirections — rejected by every matcher that inspects raw text.
-  const redirSeg = segments.find((s) => REDIRECT_RE.test(s.raw));
+  // 3. Unsafe redirections — matchers reject redirects that write a file or
+  //    read from one. Safe stream redirects (2>/dev/null, 2>&1, …) are fine and
+  //    are not flagged here.
+  const redirSeg = segments.find((s) => hasUnsafeRedirection(s.raw));
   if (redirSeg) {
     return {
-      reason: `A segment uses redirection ("${redirSeg.raw.trim()}"), which matchers reject.`,
-      hint: "Drop the redirection (e.g. `2>/dev/null`) so the command can be matched, or approve it manually.",
+      reason: `A segment redirects to/from a file ("${redirSeg.raw.trim()}"), which matchers reject.`,
+      hint: "Drop the file redirection (e.g. `> out.log`) so the command can be matched, or approve it manually. Stream redirects like `2>/dev/null` are allowed.",
     };
   }
 

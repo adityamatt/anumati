@@ -44,10 +44,11 @@ Reserve Bash for things that genuinely need a shell.
 
 ## What blocks auto-approval (avoid these in Bash)
 
-1. **Redirections — including `2>&1` and `2>/dev/null`.** Any `>` or `<` in a
-   command disqualifies the read-only inspection matcher, and `2>&1` additionally
-   breaks the parser (the bare `&` is read as a background operator). Drop stderr
-   redirects; if you need to see stderr, just run the command.
+1. **File redirections.** Writing or reading a file via `> file`, `>> file`,
+   `2> file`, or `< file` turns a read-only command into one with a side effect,
+   so matchers reject it. **Safe stream redirects are allowed**, though: ones
+   that only discard or merge output — `2>/dev/null`, `>/dev/null`, `2>&1`,
+   `>&2` — pass fine (e.g. `grep -rn foo src 2>/dev/null` auto-approves).
 
 2. **Statement separators `;`, `&&`, `||`, newlines** (for inspection commands).
    Read-only inspection only chains through **pipes** `|`. Split sequenced
@@ -76,7 +77,8 @@ Reserve Bash for things that genuinely need a shell.
   ```
   Allowed builtins include: `ls cat head tail wc file stat du df tree pwd which
   type basename dirname date grep rg sort uniq cut tr diff column find env
-  printenv realpath readlink nl fold comm tac`. No redirection, pipes only.
+  printenv realpath readlink nl fold comm tac`. No file redirection; pipes and
+  safe stream redirects (`2>/dev/null`, `2>&1`) are fine.
 
 - **Read-only git**, optionally piped to those builtins:
   ```bash
@@ -106,7 +108,7 @@ Reserve Bash for things that genuinely need a shell.
 ## Quick rules of thumb
 
 - One command per Bash call; use separate calls instead of `;` / `&&` chains.
-- No `>`, `>>`, `<`, `2>&1`, `2>/dev/null` — drop the redirect.
+- No file redirects (`> file`, `>> file`, `2> file`, `< file`); stream redirects (`2>/dev/null`, `2>&1`) are fine.
 - No `echo` headers, no `$(...)`, no backticks.
 - Reach for **Read / Grep / Glob / Edit / Write** before shelling out.
 - Pipes into read-only builtins (`| head`, `| grep`, `| wc -l`) are fine.

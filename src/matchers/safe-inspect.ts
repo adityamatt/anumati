@@ -1,4 +1,5 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 // Read-only inspection builtins. Conservative allowlist — anything that can
 // write (sed -i, awk, tee, xargs) or run other programs is deliberately omitted.
@@ -16,8 +17,9 @@ const FIND_DANGEROUS = new Set([
 ]);
 
 function isSafeInspectSegment(raw: string): boolean {
-  // Reject any redirection — parseCompound preserves these in raw
-  if (raw.includes(">") || raw.includes("<")) return false;
+  // Reject file-writing / input redirection; safe stream redirects
+  // (2>/dev/null, 2>&1, &>/dev/null, …) are allowed.
+  if (hasUnsafeRedirection(raw)) return false;
 
   const argv = tokenize(raw);
   if (!argv || argv.length === 0) return false;

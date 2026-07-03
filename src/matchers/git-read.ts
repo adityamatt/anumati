@@ -1,4 +1,5 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 // Read-only git subcommands that are safe to allow.
 const READ_SUBCOMMANDS = new Set([
@@ -146,9 +147,10 @@ function isSafePipeTarget(raw: string): boolean {
   return !!argv && SAFE_PIPE_TARGETS.has(argv[0]);
 }
 
-// Reject redirections in any segment's raw text.
+// Reject file-writing / input redirection in any segment's raw text; safe
+// stream redirects (2>/dev/null, 2>&1, …) are permitted.
 function hasRedirection(raw: string): boolean {
-  return /[<>]/.test(raw);
+  return hasUnsafeRedirection(raw);
 }
 
 export function matchGitRead(command: string): boolean {

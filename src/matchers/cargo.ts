@@ -1,5 +1,6 @@
 import { basename } from "path";
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 // cargo subcommands that are read-only / build / test / lint and safe to allow
 const ALLOWED_SUBCOMMANDS = new Set([
@@ -35,9 +36,10 @@ const SAFE_PIPE_BUILTINS = new Set([
   "rg",
 ]);
 
-// Reject redirections, which the parser does not catch on its own
+// Reject file-writing / input redirection (safe stream redirects like
+// 2>/dev/null and 2>&1 are permitted); the parser leaves these in the raw text.
 function hasRedirection(raw: string): boolean {
-  return raw.includes(">") || raw.includes("<");
+  return hasUnsafeRedirection(raw);
 }
 
 function isCargoSegment(raw: string): boolean {

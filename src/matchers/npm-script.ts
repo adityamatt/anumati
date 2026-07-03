@@ -1,4 +1,5 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn"]);
 
@@ -16,7 +17,7 @@ const READONLY_SUBCOMMANDS = new Set([
 ]);
 
 function hasRedirection(raw: string): boolean {
-  return raw.includes(">") || raw.includes("<");
+  return hasUnsafeRedirection(raw);
 }
 
 // npm/pnpm/yarn read-only queries — independent of allowedScripts.

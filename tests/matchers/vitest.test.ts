@@ -30,6 +30,14 @@ describe("matchVitest — allow", () => {
     expect(matchVitest("npx vitest run lib/query | tail -8")).toBe(true);
   });
 
+  it("allows safe stream redirect 2>&1", () => {
+    expect(matchVitest("npx vitest run 2>&1")).toBe(true);
+  });
+
+  it("allows 2>/dev/null", () => {
+    expect(matchVitest("npx vitest run lib/query 2>/dev/null")).toBe(true);
+  });
+
   it("cd <dir> && npx vitest run | tail", () => {
     expect(matchVitest("cd /tmp && npx vitest run | tail -20")).toBe(true);
   });
@@ -50,10 +58,6 @@ describe("matchVitest — block", () => {
 
   it("redirection to a file", () => {
     expect(matchVitest("npx vitest run > /tmp/vt.log")).toBe(false);
-  });
-
-  it("2>&1 redirection", () => {
-    expect(matchVitest("npx vitest run 2>&1")).toBe(false);
   });
 
   it("redirect then tail via ;", () => {

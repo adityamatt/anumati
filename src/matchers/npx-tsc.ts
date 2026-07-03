@@ -1,11 +1,14 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 function isTscSegment(raw: string): boolean {
+  if (hasUnsafeRedirection(raw)) return false;
   const argv = tokenize(raw);
   return !!argv && argv[0] === "npx" && argv[1] === "tsc" && argv.includes("--noEmit");
 }
 
 function isCdSegment(raw: string): boolean {
+  if (hasUnsafeRedirection(raw)) return false;
   const argv = tokenize(raw);
   return !!argv && argv[0] === "cd" && argv.length === 2;
 }
