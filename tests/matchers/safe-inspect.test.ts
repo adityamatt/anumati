@@ -66,6 +66,18 @@ describe("matchSafeInspect — allow", () => {
   it("piped chain with a trailing 2>&1", () => {
     expect(matchSafeInspect("cat foo | grep bar 2>&1")).toBe(true);
   });
+
+  it("semicolon-separated safe reads", () => {
+    expect(matchSafeInspect("grep -rn x /bin 2>/dev/null | head; ls /bin 2>/dev/null")).toBe(true);
+  });
+
+  it("&&-separated safe reads", () => {
+    expect(matchSafeInspect("ls src && cat foo.txt")).toBe(true);
+  });
+
+  it("mixed | ; && chain of safe reads", () => {
+    expect(matchSafeInspect("cat a | grep b; ls && wc -l c")).toBe(true);
+  });
 });
 
 describe("matchSafeInspect — block", () => {
@@ -109,8 +121,16 @@ describe("matchSafeInspect — block", () => {
     expect(matchSafeInspect("ls || echo fail")).toBe(false);
   });
 
+  it("|| rejected even when both segments are safe reads", () => {
+    expect(matchSafeInspect("ls || cat foo")).toBe(false);
+  });
+
   it("background operator", () => {
     expect(matchSafeInspect("ls & cat foo")).toBe(false);
+  });
+
+  it("backgrounding rejected even with safe segments", () => {
+    expect(matchSafeInspect("ls src & cat foo")).toBe(false);
   });
 
   it("sed is not allowed", () => {

@@ -18,9 +18,11 @@ export interface DebugNote {
 }
 
 // Operators a command can be split on; only some are accepted by matchers, and
-// each matcher decides which. `;`, `||`, and backgrounding `&` are never
-// accepted by any matcher, so they are always worth calling out.
-const NEVER_ACCEPTED_OPS = new Set([";", "||", "&"]);
+// each matcher decides which. `||` and backgrounding `&` are never accepted by
+// any matcher, so they are always worth calling out. (`;` and `&&` are accepted
+// by some matchers — e.g. safe-inspect chains read-only segments — so they are
+// not flagged here; the real blocker in those cases is an uncovered segment.)
+const NEVER_ACCEPTED_OPS = new Set(["||", "&"]);
 
 const SUBSTITUTION_RE = /[`$]/;
 
@@ -63,10 +65,7 @@ export function debugDiagnose(input: HookInput): DebugNote | null {
     const op = blockedOp.operator;
     return {
       reason: `Command chains segments with "${op}", which no matcher accepts (it means independent commands).`,
-      hint:
-        op === ";"
-          ? "Split this into separate tool calls, or use `&&` if a matcher supports it (e.g. `cd X && cargo build`)."
-          : "Run the segments as separate commands so each can be matched on its own.",
+      hint: "Run the segments as separate commands so each can be matched on its own.",
     };
   }
 
