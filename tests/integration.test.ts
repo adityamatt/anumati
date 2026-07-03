@@ -105,18 +105,19 @@ describe("hook — suggestion on passthrough", () => {
 });
 
 describe("hook — debug mode", () => {
-  it("explains WHY a `;`-chained command fell through (via systemMessage)", () => {
+  it("explains WHY a `||`-chained command fell through (via systemMessage)", () => {
     writeFileSync(configPath, JSON.stringify({ suggest: { debug: true }, allow: [] }));
     const res = run([configPath], {
       session_id: "s",
       tool_name: "Bash",
-      tool_input: { command: "cat a 2>/dev/null; cat b" },
+      // `||` is never accepted by any matcher → the debug note is about the operator.
+      tool_input: { command: "cat a || cat b" },
       cwd: dir,
     });
     expect(isPassthroughMessage(res.stdout)).toBe(true); // still passthrough
     const msg = systemMessage(res.stdout);
     expect(msg).toContain("🔍 anumati [debug]");
-    expect(msg).toContain(";");
+    expect(msg).toContain("||");
   });
 
   it("is silent when debug is off (default)", () => {
@@ -124,7 +125,7 @@ describe("hook — debug mode", () => {
     const res = run([configPath], {
       session_id: "s",
       tool_name: "Bash",
-      tool_input: { command: "cat a; cat b" },
+      tool_input: { command: "cat a || cat b" },
       cwd: dir,
     });
     expect(res.stdout).toBe("");

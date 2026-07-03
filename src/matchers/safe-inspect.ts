@@ -42,6 +42,13 @@ function isSafeInspectSegment(raw: string): boolean {
   return true;
 }
 
+// Operators permitted between inspection segments. `|` (pipeline), `;` and `&&`
+// (sequencing) are pure control flow — they only decide whether the next
+// command runs. Since every segment must independently be a safe read-only
+// inspection, a chain of them can only ever run safe reads. `||` and a
+// backgrounding `&` are deliberately excluded.
+const ALLOWED_CHAIN_OPS = new Set(["|", ";", "&&"]);
+
 export function matchSafeInspect(command: string): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
@@ -49,8 +56,7 @@ export function matchSafeInspect(command: string): boolean {
   let hasInspect = false;
 
   for (const segment of segments) {
-    // Only pipes (or nothing) allowed between segments
-    if (segment.operator !== null && segment.operator !== "|") return false;
+    if (segment.operator !== null && !ALLOWED_CHAIN_OPS.has(segment.operator)) return false;
     if (!isSafeInspectSegment(segment.raw)) return false;
     hasInspect = true;
   }

@@ -10,9 +10,17 @@ function read(file_path: string): HookInput {
 }
 
 describe("debugDiagnose — Bash blockers", () => {
-  it("flags a `;` separator as never accepted", () => {
+  it("does NOT flag `;` as a hard blocker (some matchers chain safe reads)", () => {
+    // `cat a; cat b` is now approvable by safe-inspect, so the `;` operator is
+    // not reported as a never-accepted blocker.
     const n = debugDiagnose(bash("cat a; cat b"));
-    expect(n?.reason).toContain(";");
+    expect(n?.reason ?? "").not.toContain('chains segments with ";"');
+  });
+
+  it("flags a never-accepted operator on an uncovered `;` chain", () => {
+    // kubectl isn't covered, and `||` is never accepted → operator is flagged.
+    const n = debugDiagnose(bash("kubectl get pods || kubectl delete pod x"));
+    expect(n?.reason).toContain("||");
     expect(n?.hint).toContain("separate");
   });
 
