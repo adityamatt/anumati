@@ -50,9 +50,11 @@ Reserve Bash for things that genuinely need a shell.
    that only discard or merge output — `2>/dev/null`, `>/dev/null`, `2>&1`,
    `>&2` — pass fine (e.g. `grep -rn foo src 2>/dev/null` auto-approves).
 
-2. **Statement separators `;`, `&&`, `||`, newlines** (for inspection commands).
-   Read-only inspection only chains through **pipes** `|`. Split sequenced
-   statements into separate Bash calls.
+2. **`||` and backgrounding `&`.** Read-only inspection chains through pipes
+   `|` and sequencing `;` / `&&` **only when every segment is itself a safe
+   read** — but `||` and a trailing `&` are never accepted. (Build/test matchers
+   like `npx-tsc`/`cargo`/`vitest` are stricter: a single command, optionally
+   `cd <dir> &&`-prefixed and piped to a builtin — no `;` chains.)
 
 3. **`echo` scaffolding / section headers.** Don't narrate output with
    `echo "=== step ==="`. It's an uncovered command that sinks the whole chain.
@@ -104,6 +106,78 @@ Reserve Bash for things that genuinely need a shell.
 - **Pure-compute `python3 -c` / `node -e`** using only allowlisted,
   side-effect-free modules (no file/network/subprocess). A trailing
   `|| echo <fallback>` is tolerated for these.
+
+## Recipes — common tasks, the approvable way
+
+Real patterns that keep falling through, with the drop-in replacement. The
+left column is what *not* to reach for; the right column auto-approves.
+
+### Type-check / build / test — don't wrap in a logfile
+
+The "redirect to a log, echo the exit code, tail the log" wrapper is the single
+most common false start. It stacks a file redirect, a `$?` substitution, `echo`
+scaffolding, and `;` chaining — all disqualifiers. The tool prints its output to
+the terminal anyway, so the wrapper buys nothing.
+
+```bash
+# AVOID — falls through (file redirect + $? + ; chain)
+npx tsc --noEmit > /tmp/tsc.log 2>&1 ; echo "tsc exit: $?" ; tail -8 /tmp/tsc.log
+npx vitest run > /tmp/vt.log 2>&1 && echo OK || (echo FAIL; cat /tmp/vt.log)
+
+# PREFER — auto-approves, and you still see errors on failure
+npx tsc --noEmit
+npx vitest run lib/query
+npx vitest run lib/query | tail -20        # pipe to a builtin is fine
+```
+
+### Never redirect to a file just to read it back
+
+`> file … ; tail file` is always two disqualifiers (a file write, then a
+sequence). Pipe directly instead.
+
+```bash
+# AVOID
+cmd > /tmp/out.log 2>&1 ; tail -20 /tmp/out.log
+# PREFER — merge stderr into the pipe (2>&1 is a safe stream redirect)
+cmd 2>&1 | tail -20
+```
+
+### Don't use `$?`, `$(...)`, or backticks
+
+Any `$` or backtick makes anumati refuse to parse the command at all. If you
+need a computed value, run it as its own step and use the result.
+
+```bash
+# AVOID
+echo "exit: $?"            # inspect the exit code out of band, not inline
+ls "$(git rev-parse --show-toplevel)"
+# PREFER
+git rev-parse --show-toplevel    # one call
+ls <the-path-it-printed>         # next call
+```
+
+### Reading a JSON/file in `python3 -c`
+
+`open()` is allowed **only** under a path in the rule's `open.allowed_paths`. If
+a read falls through, the fix is to add the prefix (`anumati add python3-pipe
+--paths /tmp`), not to rephrase the code. Keep imports to the allowlisted
+pure-stdlib set (`json`, `math`, …).
+
+```bash
+# Auto-approves once /tmp is in allowed_paths:
+python3 -c "import json; d=json.load(open('/tmp/result.json')); print(len(d['dataPoints']))"
+```
+
+### Inspecting files — prefer the dedicated tools
+
+```bash
+# AVOID (bash)                          # PREFER (tool call)
+cat config.json                          Read  config.json
+grep -rn "foo" src                       Grep  "foo" in src
+find . -name '*.ts'                      Glob  **/*.ts
+```
+Bash `grep`/`ls`/`cat` still auto-approve when you do need them — but the tools
+are cleaner and never trip a shell-parsing edge case.
 
 ## Quick rules of thumb
 
