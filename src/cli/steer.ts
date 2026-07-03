@@ -16,7 +16,7 @@ matchers. Prefer phrasing work in approvable shapes so routine commands run
 without a manual permission prompt:
 
 - **One command per Bash call** — avoid \`;\` / \`&&\` chains and multi-statement scripts. Use separate calls.
-- **No redirections** in Bash inspection commands — drop \`>\`, \`>>\`, \`<\`, \`2>&1\`, \`2>/dev/null\`.
+- **No file redirections** — drop \`> file\`, \`>> file\`, \`2> file\`, \`< file\` (they write/read files). Stream redirects that only discard or merge output (\`2>/dev/null\`, \`>/dev/null\`, \`2>&1\`) are fine.
 - **No \`echo\` section headers, no \`$(...)\` command substitution, no backticks.**
 - **Prefer dedicated tools over shelling out:** Read (not \`cat\`), Grep (not bash \`grep\`), Glob (not \`find\`/\`ls\`), Edit/Write (not \`echo >\`).
 - Pipes into read-only builtins (\`| head\`, \`| grep\`, \`| wc -l\`) are fine.

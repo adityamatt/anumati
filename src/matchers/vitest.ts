@@ -1,5 +1,6 @@
 import { basename } from "path";
 import { parseCompound, tokenize } from "../parser/shell.js";
+import { hasUnsafeRedirection } from "../parser/redirect.js";
 
 // Builtins safe to receive vitest output via a pipe.
 const SAFE_PIPE_BUILTINS = new Set([
@@ -14,9 +15,10 @@ const SAFE_PIPE_BUILTINS = new Set([
   "rg",
 ]);
 
-// Reject redirections, which the parser does not catch on its own.
+// Reject file-writing / input redirection (safe stream redirects like
+// 2>/dev/null and 2>&1 are permitted); the parser leaves these in the raw text.
 function hasRedirection(raw: string): boolean {
-  return raw.includes(">") || raw.includes("<");
+  return hasUnsafeRedirection(raw);
 }
 
 // A vitest invocation is either `npx vitest run …` or a direct `vitest run …`.

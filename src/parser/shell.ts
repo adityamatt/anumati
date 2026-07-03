@@ -37,7 +37,11 @@ export function parseCompound(command: string): Segment[] | null {
       else if (ch === "&" && next === "&") { push(i, "&&", 2); i++; }
       else if (ch === "|") { push(i, "|", 1); }
       else if (ch === ";") { push(i, ";", 1); }
-      else if (ch === "&")  { push(i, "&", 1); }
+      // A bare `&` is a background operator EXCEPT when it is part of a redirect:
+      // `>&` (fd duplication, e.g. `2>&1`, `>&2`) or `&>` (bash's merge redirect,
+      // e.g. `&>/dev/null`). Those must stay inside the segment so redirect
+      // classification can see them intact.
+      else if (ch === "&" && next !== ">" && command[i - 1] !== ">") { push(i, "&", 1); }
     }
     i++;
   }

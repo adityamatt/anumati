@@ -24,14 +24,17 @@ describe("debugDiagnose — Bash blockers", () => {
     expect(debugDiagnose(bash("sleep 1 &"))?.reason).toContain("&");
   });
 
-  it("flags redirection", () => {
+  it("flags file redirection", () => {
     const n = debugDiagnose(bash("cat foo > out.txt"));
-    expect(n?.reason).toContain("redirection");
-    expect(n?.hint).toContain("redirection");
+    expect(n?.reason).toContain("redirects to/from a file");
+    expect(n?.hint).toContain("file redirection");
   });
 
-  it("flags 2>/dev/null style redirection", () => {
-    expect(debugDiagnose(bash("cat foo 2>/dev/null"))?.reason).toContain("redirection");
+  it("does NOT flag safe stream redirects like 2>/dev/null", () => {
+    // `cat foo 2>/dev/null` is now matchable by safe-inspect, so it should not
+    // reach the redirection branch — the diagnosis (if any) is about something else.
+    const n = debugDiagnose(bash("cat foo 2>/dev/null"));
+    expect(n?.reason ?? "").not.toContain("redirect");
   });
 
   it("flags shell substitution before parsing", () => {

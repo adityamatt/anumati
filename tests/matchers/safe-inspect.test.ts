@@ -58,6 +58,14 @@ describe("matchSafeInspect — allow", () => {
     expect(matchSafeInspect("realpath ./foo")).toBe(true);
     expect(matchSafeInspect("readlink -f ./foo")).toBe(true);
   });
+
+  it("grep with 2>/dev/null (safe stream redirect)", () => {
+    expect(matchSafeInspect('grep -rn "A\\|B" /a /b 2>/dev/null')).toBe(true);
+  });
+
+  it("piped chain with a trailing 2>&1", () => {
+    expect(matchSafeInspect("cat foo | grep bar 2>&1")).toBe(true);
+  });
 });
 
 describe("matchSafeInspect — block", () => {
