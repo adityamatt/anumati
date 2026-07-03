@@ -127,6 +127,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
 | `safe-read` | Read | allow file reads without `..` path traversal | — |
+| `safe-write` | Write/Edit | allow writes whose resolved path stays within an allowlisted directory | `allowed_write_paths` |
 
 ### Audit levels
 
