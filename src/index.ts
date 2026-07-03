@@ -19,6 +19,7 @@ import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
 import { runApply } from "./cli/apply.js";
 import { runDebug } from "./cli/debug.js";
+import { runStats } from "./cli/stats.js";
 import { runSessionStart } from "./cli/session-start.js";
 import type {
   Config,
@@ -203,6 +204,8 @@ Usage:
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
+  anumati stats                    Show auto-approved vs passed-through counts and ratio, from the
+                                   audit logs. Targets the root config; --project / --config to retarget.
   anumati --help | -h              Show this help.
   anumati --version | -V           Show the installed version.
 
@@ -241,6 +244,10 @@ function main(): void {
   }
   if (subcommand === "debug") {
     runDebug(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "stats") {
+    runStats(process.argv.slice(2));
     return;
   }
   if (subcommand === "session-start") {
