@@ -129,6 +129,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `safe-read` | Read | allow file reads without `..` path traversal | — |
 | `safe-write` | Write/Edit | allow writes whose resolved path stays within an allowlisted directory | `allowed_write_paths` |
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
+| `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
 
 ### Audit levels
 
@@ -230,6 +231,33 @@ anumati add safe-read
 ```
 
 Flags: `--domain`/`--domains`, `--imports`, `--modules`, `--packages`, `--scripts`, `--repos`, `--paths` (comma-separated or repeated). Targets `~/.claude/permissions.json` by default; override with `--config <path>`.
+
+### `anumati stats`
+
+Read the audit logs and report how many calls were auto-approved vs passed through, with the approval ratio and a per-tool breakdown:
+
+```bash
+anumati stats                 # root config's logs
+anumati stats --project       # this folder's config
+anumati stats --config <path> # a specific config
+```
+
+```
+anumati stats — ~/.claude/permissions.json
+
+  Auto-approved :    769  (75.9%)
+  Passed through:    244  (24.1%)
+  Total         :   1013
+
+  approve rate  ██████████████████░░░░░░ 75.9%
+
+  Auto-approved by tool:
+    Read       504
+    Bash       154
+    ...
+```
+
+Counts come from the `audit_file` (approvals) and `passthrough_file` (passthroughs), classified by each entry's `decision` — so it works whether they're separate files or the legacy single file. A low approval ratio, or a tool dominating the passthrough list, tells you where a new or extended matcher would help. Auditing must be enabled (it is by default after `anumati init`) for there to be anything to count.
 
 ### `anumati apply`
 
