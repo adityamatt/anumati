@@ -13,6 +13,7 @@ import {
   wireAnumatiHook,
   type WireResult,
 } from "./settings.js";
+import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
 
 // Safe, parameter-free starter rules. All low-risk and broadly useful, so a
 // fresh user gets immediate value without having to hand-write any allowlists.
@@ -79,6 +80,7 @@ export interface InitOptions {
   audit?: boolean; // scaffold an audit block + log file (default: true)
   hook?: boolean; // register the PreToolUse hook in settings.json (default: true)
   banner?: boolean; // register the SessionStart "anumati active" banner (default: true)
+  steer?: boolean; // add the command-style guidance block to CLAUDE.md (default: true)
   debug?: boolean; // seed suggest.debug in the starter config (default: false)
   // How anumati was launched — used to build the hook command. Injected for
   // testability; default to the real process values in runInit().
@@ -93,6 +95,8 @@ export interface InitResult {
   passthroughFile?: string; // set when a passthrough (denials) log was scaffolded
   hook?: WireResult; // set when hook wiring succeeded
   hookError?: string; // set when hook wiring failed (non-fatal — config still written)
+  steer?: SteerResult; // set when the CLAUDE.md guidance block was written
+  steerError?: string; // set when steer wiring failed (non-fatal — config still written)
 }
 
 export interface LevelStatus {
@@ -180,7 +184,21 @@ export function applyInit(opts: InitOptions & { config: string }): InitResult {
     }
   }
 
-  return { configPath, ruleCount: config.allow?.length ?? 0, auditFile, passthroughFile, hook, hookError };
+  // Add the command-style guidance to the CLAUDE.md beside this config, so the
+  // agent is steered toward emitting auto-approvable commands. Idempotent and
+  // non-destructive: it updates only its own managed block, preserving any
+  // existing CLAUDE.md content. Non-fatal on failure — the config is written.
+  let steer: SteerResult | undefined;
+  let steerError: string | undefined;
+  if (opts.steer !== false) {
+    try {
+      steer = wireSteerFile(claudeMdFileFor(configPath));
+    } catch (err) {
+      steerError = (err as Error).message;
+    }
+  }
+
+  return { configPath, ruleCount: config.allow?.length ?? 0, auditFile, passthroughFile, hook, hookError, steer, steerError };
 }
 
 export function parseInitArgs(args: string[]): InitOptions {
@@ -199,6 +217,8 @@ export function parseInitArgs(args: string[]): InitOptions {
       opts.hook = false;
     } else if (arg === "--no-banner") {
       opts.banner = false;
+    } else if (arg === "--no-steer") {
+      opts.steer = false;
     } else if (arg === "--debug") {
       opts.debug = true;
     } else if (arg === "--config") {
@@ -290,6 +310,15 @@ function printResult(result: InitResult): void {
     console.log(`\nNext: wire the hook into settings.json so Claude Code calls anumati:`);
     console.log(`    "PreToolUse": [{ "matcher": "Bash|Read|Write|Edit",`);
     console.log(`      "hooks": [{ "type": "command", "command": "anumati ${prettyPath(result.configPath)}", "timeout": 5 }] }]`);
+  }
+
+  if (result.steerError) {
+    console.log(`\n⚠️  Could not update ${prettyPath(claudeMdFileFor(result.configPath))}: ${result.steerError}`);
+  } else if (result.steer?.changed) {
+    const verb = result.steer.created ? "Created" : "Updated";
+    console.log(`\n✓ ${verb} ${prettyPath(result.steer.claudeMdPath)} with command-style guidance for the agent.`);
+  } else if (result.steer) {
+    console.log(`\n• ${prettyPath(result.steer.claudeMdPath)} already has the guidance block — left as-is.`);
   }
 
   console.log(`\nAdd more rules as you go, e.g. \`anumati add curl --domain api.github.com\`.`);

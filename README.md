@@ -44,7 +44,7 @@ anumati init
 3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
 4. **Adds a SessionStart banner** — a `⚡ anumati active — N rules` message shown at the start of each session so you can see at a glance that anumati is wired up.
 
-Pass `--project` / `--root` to skip the prompt, `--force` to overwrite an existing config, and `--no-audit` / `--no-hook` / `--no-banner` to skip those steps. Add more rules as you go with `anumati add` (see below).
+Pass `--project` / `--root` to skip the prompt, `--force` to overwrite an existing config, and `--no-audit` / `--no-hook` / `--no-banner` / `--no-steer` to skip those steps. Add more rules as you go with `anumati add` (see below).
 
 ---
 
@@ -155,6 +155,19 @@ Every suggestion is **verified** — anumati only suggests a change if re-runnin
 
 Suggestions are also appended to `~/.claude/anumati-suggestions.jsonl` so you can review them in a batch later.
 
+## Command-style guide for the LLM
+
+The complement to matchers is teaching the agent to *emit* approvable commands
+in the first place — one command per call, no stray redirections or `echo`
+scaffolding, dedicated tools over shelling out.
+
+`anumati init` writes this guidance automatically: it adds a managed block to
+the `CLAUDE.md` beside your config (created if absent, and updated in place on
+re-run without touching your own content), so Claude Code loads it into every
+session and keeps routine work on the silent auto-approve path. Skip it with
+`--no-steer`. The full, in-depth version lives in
+[`docs/COMMAND-STYLE.md`](docs/COMMAND-STYLE.md) for reference.
+
 ### `anumati init`
 
 Scaffold a starter config, an audit log, and the PreToolUse hook in one step:
@@ -167,6 +180,7 @@ anumati init --force     # overwrite an existing config
 anumati init --no-audit  # don't scaffold the audit log
 anumati init --no-hook   # don't register the hook in settings.json
 anumati init --no-banner # don't add the SessionStart "⚡ anumati active" banner
+anumati init --no-steer  # don't add command-style guidance to the sibling CLAUDE.md
 anumati init --debug     # start with debug mode on (explains passthroughs)
 ```
 

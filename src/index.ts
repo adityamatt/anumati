@@ -175,8 +175,9 @@ Usage:
   anumati init [--root|--project]  Create a starter config with safe default rules.
                                    Prompts for the level if not specified; --force to overwrite.
                                    Also scaffolds an audit log, registers the PreToolUse hook,
-                                   and adds a SessionStart "⚡ anumati active" banner
-                                   (--no-audit / --no-hook / --no-banner to skip;
+                                   adds a SessionStart "⚡ anumati active" banner, and writes
+                                   command-style guidance to the sibling CLAUDE.md
+                                   (--no-audit / --no-hook / --no-banner / --no-steer to skip;
                                    --debug to start with debug mode on).
   anumati add <matcher> [flags]    Add or extend an allow rule in a config.
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
