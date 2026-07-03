@@ -12,6 +12,7 @@ import { matchGitRead } from "./git-read.js";
 import { matchNpmScript } from "./npm-script.js";
 import { matchCargo } from "./cargo.js";
 import { matchGo } from "./go.js";
+import { matchCd } from "./cd.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -31,6 +32,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "npm-script":   return matchNpmScript(cmd, rule.allowed_scripts ?? []);
     case "cargo":        return matchCargo(cmd);
     case "go":           return matchGo(cmd);
+    case "cd":           return matchCd(cmd, input.cwd ?? "");
     default:             return false;
   }
 }
