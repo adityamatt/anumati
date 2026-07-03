@@ -69,6 +69,11 @@ describe("parseInitArgs", () => {
     expect(parseInitArgs(["--debug"]).debug).toBe(true);
     expect(parseInitArgs([]).debug).toBeUndefined(); // off unless requested
   });
+
+  it("parses --no-steer", () => {
+    expect(parseInitArgs(["--no-steer"]).steer).toBe(false);
+    expect(parseInitArgs([]).steer).toBeUndefined(); // defaults on at apply time
+  });
 });
 
 describe("resolveInitTarget", () => {
@@ -212,6 +217,40 @@ describe("applyInit — audit log", () => {
   it("does not add a suggest block by default", () => {
     applyInit({ config: configPath, hook: false });
     expect(read().suggest).toBeUndefined();
+  });
+});
+
+describe("applyInit — steer file (CLAUDE.md)", () => {
+  const claudeMd = () => join(dir, "CLAUDE.md");
+
+  it("writes command-style guidance to CLAUDE.md beside the config by default", () => {
+    const res = applyInit({ config: configPath, hook: false });
+    expect(res.steer?.claudeMdPath).toBe(claudeMd());
+    expect(res.steer?.changed).toBe(true);
+    expect(existsSync(claudeMd())).toBe(true);
+    expect(readFileSync(claudeMd(), "utf-8")).toContain("anumati-friendly command style");
+  });
+
+  it("skips the steer file with steer:false", () => {
+    const res = applyInit({ config: configPath, hook: false, steer: false });
+    expect(res.steer).toBeUndefined();
+    expect(existsSync(claudeMd())).toBe(false);
+  });
+
+  it("does not duplicate the block on --force re-init", () => {
+    applyInit({ config: configPath, hook: false });
+    const res = applyInit({ config: configPath, hook: false, force: true });
+    expect(res.steer?.changed).toBe(false);
+    const content = readFileSync(claudeMd(), "utf-8");
+    expect(content.split("BEGIN anumati").length - 1).toBe(1);
+  });
+
+  it("preserves pre-existing CLAUDE.md content", () => {
+    writeFileSync(claudeMd(), "# Existing\n\nKeep me.\n");
+    applyInit({ config: configPath, hook: false });
+    const content = readFileSync(claudeMd(), "utf-8");
+    expect(content).toContain("Keep me.");
+    expect(content).toContain("anumati-friendly command style");
   });
 });
 
