@@ -116,6 +116,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
 | `safe-read` | Read | allow file reads without .. traversal | — |
+| `safe-write` | Write/Edit | allow writes whose resolved path is contained within an allowlisted directory | `allowed_write_paths` |
 
 ## Adding a new named matcher
 

@@ -2,6 +2,7 @@ import type { HookInput, Rule } from "../types.js";
 import { matchCurl } from "./curl.js";
 import { matchNpxTsc } from "./npx-tsc.js";
 import { matchSafeRead } from "./safe-read.js";
+import { matchSafeWrite } from "./safe-write.js";
 import { matchPython3Pipe } from "./python3-pipe.js";
 import { matchNodejsPipe } from "./nodejs-pipe.js";
 import { matchGh } from "./gh.js";
@@ -20,6 +21,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "curl":         return matchCurl(cmd, rule.allowed_domains ?? [], rule.allowed_imports ?? [], rule.open?.allowed_paths ?? []);
     case "npx-tsc":      return matchNpxTsc(cmd);
     case "safe-read":    return matchSafeRead(filePath);
+    case "safe-write":   return matchSafeWrite(filePath, rule.allowed_write_paths ?? [], input.cwd ?? "");
     case "python3-pipe": return matchPython3Pipe(cmd, rule.allowed_imports ?? [], rule.open?.allowed_paths ?? [], input.cwd ?? "");
     case "nodejs-pipe":  return matchNodejsPipe(cmd, rule.allowed_modules ?? [], input.cwd ?? "");
     case "gh":           return matchGh(cmd, rule.allowed_repos ?? [], rule.allowed_imports ?? [], rule.open?.allowed_paths ?? []);
