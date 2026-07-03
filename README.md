@@ -140,6 +140,26 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 
 Audit entries are appended as newline-delimited JSON to `audit_file`. `anumati init` sets this up for you — it scaffolds an empty `anumati-audit.jsonl` next to the config and points `audit_file` at it (pass `--no-audit` to skip). The path is taken verbatim with no `~` expansion, so set an absolute path if you write the config by hand. If `audit_file` is unset, auditing is disabled entirely.
 
+### Passthrough sound
+
+When a call falls through (anumati did not auto-approve it, so Claude Code's own permission flow takes over — often a prompt), anumati plays a short sound to alert you that a call may be waiting. It's **on by default** and configured under `notify`:
+
+```json
+{
+  "notify": {
+    "sound": true,
+    "sound_command": ["afplay", "/System/Library/Sounds/Funk.aiff"]
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `sound` | `false` to silence the passthrough alert. Default: `true`. |
+| `sound_command` | Override the command played. Array is argv; a string is split on whitespace. When unset, a per-platform default is used: `afplay` (macOS), `paplay` (Linux), a PowerShell `beep` (Windows). |
+
+The player is spawned detached and fire-and-forget — it never blocks the hook, never affects the permission decision, and a missing player just makes no noise. Note the sound fires on every *passthrough*, which is not always a visible prompt: if the tool is already allowlisted in Claude Code's own settings, the call proceeds silently but the sound still plays.
+
 ## Suggestions — let the config build itself
 
 When a command falls through to the permission dialog, anumati analyzes it and prints the exact config change that would auto-approve it:

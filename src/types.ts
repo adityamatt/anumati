@@ -49,9 +49,27 @@ export interface SuggestConfig {
   debug?: boolean;
 }
 
+export interface NotifyConfig {
+  /**
+   * Play a sound when a tool call falls through to Claude Code's own permission
+   * flow (i.e. anumati did not auto-approve it), alerting the user that a call
+   * may be waiting on them. Enabled by default when a config is present; set to
+   * `false` to silence. Default: true.
+   */
+  sound?: boolean;
+  /**
+   * Override the command played on passthrough. Array form is argv
+   * (["afplay", "/path/to.aiff"]); a string is split on whitespace. When unset,
+   * a per-platform default is used (afplay on macOS, paplay on Linux, a
+   * PowerShell beep on Windows).
+   */
+  sound_command?: string[] | string;
+}
+
 export interface Config {
   audit?: AuditConfig;
   suggest?: SuggestConfig;
+  notify?: NotifyConfig;
   allow?: Rule[];
 }
 
