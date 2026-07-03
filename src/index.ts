@@ -9,6 +9,7 @@ import {
   loadConfig,
 } from "./config.js";
 import { suggest } from "./suggest.js";
+import { playSound } from "./notify.js";
 import { debugDiagnose, formatDebugNote } from "./debug.js";
 import {
   storeSuggestion,
@@ -23,6 +24,7 @@ import type {
   Config,
   HookInput,
   MatchResult,
+  NotifyConfig,
   Rule,
   SuggestConfig,
 } from "./types.js";
@@ -49,6 +51,19 @@ function resolveSuggestConfig(
     show: project.show ?? root.show ?? true,
     file: project.file ?? root.file ?? defaultSuggestionsFile(),
     debug: project.debug ?? root.debug ?? false,
+  };
+}
+
+// Merge notify config across configs; project overrides root field-by-field.
+function resolveNotifyConfig(
+  projectConfig: Config | null,
+  rootConfig: Config | null,
+): NotifyConfig {
+  const root = rootConfig?.notify ?? {};
+  const project = projectConfig?.notify ?? {};
+  return {
+    sound: project.sound ?? root.sound,
+    sound_command: project.sound_command ?? root.sound_command,
   };
 }
 
@@ -100,7 +115,12 @@ function runHook(): void {
     return;
   }
 
-  // Passthrough — try to suggest a config change that would auto-approve this.
+  // Passthrough — the call is heading to Claude Code's own permission flow.
+  // Play the alert sound (fire-and-forget; never blocks or affects the decision)
+  // so the user knows a call may be waiting on them.
+  playSound(resolveNotifyConfig(projectConfig, rootConfig));
+
+  // Try to suggest a config change that would auto-approve this.
   const sc = resolveSuggestConfig(projectConfig, rootConfig);
 
   const allRules: Rule[] = [
