@@ -21,6 +21,11 @@ without a manual permission prompt:
 - **Prefer dedicated tools over shelling out:** Read (not \`cat\`), Grep (not bash \`grep\`), Glob (not \`find\`/\`ls\`), Edit/Write (not \`echo >\`).
 - Pipes into read-only builtins (\`| head\`, \`| grep\`, \`| wc -l\`) are fine.
 
+Common fixes:
+- Type-check/test: run \`npx tsc --noEmit\` or \`npx vitest run <path>\` directly — don't wrap in \`> log 2>&1 ; echo $? ; tail log\`. Errors still print to the terminal.
+- Need stderr with output? \`cmd 2>&1 | tail -20\` (not \`cmd > file 2>&1 ; tail file\`).
+- \`python3 -c\` reading a file: fine if the path is in the rule's \`open.allowed_paths\` (add one with \`anumati add python3-pipe --paths <dir>\`).
+
 Doing this keeps routine work on the silent auto-approve path and reserves
 manual prompts for genuinely unusual commands.`;
 
