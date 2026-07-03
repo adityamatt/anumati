@@ -128,6 +128,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
 | `safe-read` | Read | allow file reads without `..` path traversal | — |
 | `safe-write` | Write/Edit | allow writes whose resolved path stays within an allowlisted directory | `allowed_write_paths` |
+| `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
 
 ### Audit levels
 
