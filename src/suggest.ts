@@ -23,7 +23,6 @@ import { matchGo } from "./matchers/go.js";
 import { matchGitRead } from "./matchers/git-read.js";
 import { matchSafeInspect } from "./matchers/safe-inspect.js";
 import { matchNpxTsc } from "./matchers/npx-tsc.js";
-import { matchSafeRead } from "./matchers/safe-read.js";
 
 export interface Suggestion {
   /** The anumati CLI command to run to apply this suggestion */
@@ -45,7 +44,6 @@ export interface Suggestion {
  */
 export function suggest(input: HookInput, allRules: Rule[]): Suggestion | null {
   if (input.tool_name === "Bash") return suggestBash(input, allRules);
-  if (input.tool_name === "Read") return suggestRead(input, allRules);
   return null;
 }
 
@@ -59,25 +57,6 @@ function suggestBash(input: HookInput, allRules: Rule[]): Suggestion | null {
 
   // No near-miss — classify the command and suggest a brand-new rule.
   return suggestNewRule(cmd, allRules, input.cwd ?? "");
-}
-
-function suggestRead(input: HookInput, allRules: Rule[]): Suggestion | null {
-  const filePath = input.tool_input.file_path ?? "";
-  if (!filePath) return null;
-
-  // A safe-read rule already exists — the file just has traversal we won't approve.
-  if (allRules.some((r) => r.matcher === "safe-read")) return null;
-
-  // Verify: adding safe-read would actually auto-approve this path (no `..`).
-  if (!matchSafeRead(filePath)) return null;
-
-  return {
-    command: "anumati add safe-read",
-    description: "Auto-approve file reads (blocks path traversal)",
-    matcher: "safe-read",
-    configDelta: { tool: "Read", matcher: "safe-read" },
-    trigger: filePath,
-  };
 }
 
 // ── Near-miss detection ──────────────────────────────────────────────────────

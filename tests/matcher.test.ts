@@ -9,17 +9,12 @@ function bash(command: string): HookInput {
   return { session_id: "test", tool_name: "Bash", tool_input: { command } };
 }
 
-function read(file_path: string): HookInput {
-  return { session_id: "test", tool_name: "Read", tool_input: { file_path } };
-}
-
 const ALLOW_GITHUB: Rule = {
   tool: "Bash", matcher: "curl",
   allowed_domains: ["raw.githubusercontent.com", "api.github.com"],
   desc: "GitHub reads",
 };
 const ALLOW_TSC: Rule = { tool: "Bash", matcher: "npx-tsc", desc: "tsc type check" };
-const ALLOW_READS: Rule = { tool: "Read", matcher: "safe-read", desc: "safe file reads" };
 
 describe("evaluate — allow curl", () => {
   it("allows curl to allowed domain", () => {
@@ -51,16 +46,6 @@ describe("evaluate — allow npx-tsc", () => {
   });
 });
 
-describe("evaluate — allow safe-read", () => {
-  it("allows normal file path", () => {
-    expect(evaluate(read("/Users/aditya/project/src/index.ts"), [ALLOW_READS]).decision).toBe("allow");
-  });
-
-  it("returns null for path traversal", () => {
-    expect(evaluate(read("/Users/foo/../../../etc/passwd"), [ALLOW_READS]).decision).toBeNull();
-  });
-});
-
 describe("evaluate — passthrough", () => {
   it("returns null when no rules match", () => {
     const r = evaluate(bash("echo hello"), [ALLOW_GITHUB]);
@@ -79,12 +64,14 @@ describe("evaluate — passthrough", () => {
 });
 
 describe("evaluate — tool filtering", () => {
-  it("Read allow rule does not match Bash tool", () => {
-    expect(evaluate(bash("cat /etc/passwd"), [ALLOW_READS]).decision).toBeNull();
+  it("a Task-scoped rule does not match a Bash tool", () => {
+    const taskRule: Rule = { tool: "Task", subagent_type: "x" };
+    expect(evaluate(bash("cat /etc/passwd"), [taskRule]).decision).toBeNull();
   });
 
-  it("Bash allow rule does not match Read tool", () => {
-    expect(evaluate(read("/etc/passwd"), [ALLOW_GITHUB]).decision).toBeNull();
+  it("a Bash-scoped rule does not match a non-Bash tool", () => {
+    const input: HookInput = { session_id: "t", tool_name: "Task", tool_input: { subagent_type: "x" } };
+    expect(evaluate(input, [ALLOW_GITHUB]).decision).toBeNull();
   });
 });
 

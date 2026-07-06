@@ -21,8 +21,10 @@ export interface ClaudeSettings {
   [key: string]: unknown;
 }
 
-// Tools anumati evaluates. Matches the wiring documented in the README.
-export const HOOK_MATCHER = "Bash|Read|Write|Edit";
+// anumati vets Bash commands only. Read/Write/Edit safety is left to Claude
+// Code's own permission flow (path allowlists, accept-edits mode) — anumati's
+// value is deterministic vetting of shell commands, which is the hard part.
+export const HOOK_MATCHER = "Bash";
 export const HOOK_TIMEOUT = 5;
 // SessionStart banner runs once at session start; a slightly longer timeout is
 // harmless and avoids racing a cold Node start.

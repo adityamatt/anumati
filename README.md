@@ -2,11 +2,13 @@
 
 *अनुमति — Sanskrit/Hindi for "permission"*
 
-A `PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows safe tool calls based on a JSON config of **named matchers** — so you stop getting prompted for the same commands repeatedly. When a command falls through, anumati can **suggest** the exact config change that would auto-approve it next time, so your config builds itself from real usage.
+A `PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows safe **Bash commands** based on a JSON config of **named matchers** — so you stop getting prompted for the same commands repeatedly. When a command falls through, anumati can **suggest** the exact config change that would auto-approve it next time, so your config builds itself from real usage.
+
+**Scope: Bash only.** anumati deliberately vets only `Bash` tool calls — deterministic vetting of shell commands is the hard problem it exists to solve. `Read`, `Write`, and `Edit` are left to Claude Code's own permission flow (path allowlists in `settings.json`, accept-edits mode), which already handles file-path safety well. The hook is registered for `Bash` alone.
 
 ## How it works
 
-Every time Claude Code is about to run a tool (Bash, Read, …), this hook intercepts the request and checks it against your allow rules. anumati is **allow-only**: it can auto-approve a call or stay out of the way, but it never blocks anything itself.
+Every time Claude Code is about to run a **Bash** command, this hook intercepts the request and checks it against your allow rules. anumati is **allow-only**: it can auto-approve a call or stay out of the way, but it never blocks anything itself.
 
 1. **A rule matches** → the call is auto-approved, with no prompt.
 2. **No rule matches** → Claude Code shows its normal permission dialog, and anumati surfaces a 💡 suggestion (via the hook's `systemMessage`) showing how to allow it next time.
@@ -39,7 +41,7 @@ anumati init
 
 `anumati init` prompts whether to set up a **project** config (this folder) or a **root** config (global, applies everywhere), shows which already exist, and then:
 
-1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-read`, `safe-inspect`, `git-read`, `npx-tsc`, a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …), and a `nodejs-pipe` rule pre-allowing the equivalent set of **pure-compute** Node built-ins (`path`, `crypto`, `url`, `util`, `buffer`, `zlib`, …). Those modules have no file, network, or code-execution entry points. For python3 any `open()` in your script is still path-checked; for node the filesystem module `fs` (along with `child_process`/`net`/`http`/`os`/`vm`) is blocked outright — so blessing these doesn't widen file or network access. (Libraries with I/O side channels like `numpy`/`pandas`, and any npm package, are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
+1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-inspect`, `git-read`, `npx-tsc`, a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …), and a `nodejs-pipe` rule pre-allowing the equivalent set of **pure-compute** Node built-ins (`path`, `crypto`, `url`, `util`, `buffer`, `zlib`, …). Those modules have no file, network, or code-execution entry points. For python3 any `open()` in your script is still path-checked; for node the filesystem module `fs` (along with `child_process`/`net`/`http`/`os`/`vm`) is blocked outright — so blessing these doesn't widen file or network access. (Libraries with I/O side channels like `numpy`/`pandas`, and any npm package, are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
 2. **Scaffolds an audit log** (`anumati-audit.jsonl`) next to the config.
 3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
 4. **Adds a SessionStart banner** — a `⚡ anumati active — N rules` message shown at the start of each session so you can see at a glance that anumati is wired up.
@@ -64,8 +66,7 @@ Prefer to do it by hand? Write the config yourself — a fuller example:
       "desc": "GitHub reads"
     },
     { "tool": "Bash", "matcher": "npx-tsc", "desc": "TypeScript type checking" },
-    { "tool": "Bash", "matcher": "git-read", "desc": "Read-only git" },
-    { "tool": "Read", "matcher": "safe-read", "desc": "File reads (no path traversal)" }
+    { "tool": "Bash", "matcher": "git-read", "desc": "Read-only git" }
   ]
 }
 ```
@@ -77,7 +78,7 @@ Prefer to do it by hand? Write the config yourself — a fuller example:
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Read|Write|Edit",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -126,8 +127,6 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/…) | — |
 | `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
-| `safe-read` | Read | allow file reads without `..` path traversal | — |
-| `safe-write` | Write/Edit | allow writes whose resolved path stays within an allowlisted directory | `allowed_write_paths` |
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
 
@@ -227,7 +226,7 @@ anumati add python3-pipe --imports pandas,numpy
 anumati add nodejs-pipe --modules os,fs
 anumati add pip3-install --packages flask
 anumati add cargo
-anumati add safe-read
+anumati add safe-inspect
 ```
 
 Flags: `--domain`/`--domains`, `--imports`, `--modules`, `--packages`, `--scripts`, `--repos`, `--paths` (comma-separated or repeated). Targets `~/.claude/permissions.json` by default; override with `--config <path>`.
@@ -245,19 +244,14 @@ anumati stats --config <path> # a specific config
 ```
 anumati stats — ~/.claude/permissions.json
 
-  Auto-approved :    769  (75.9%)
-  Passed through:    244  (24.1%)
-  Total         :   1013
+  Auto-approved :    196  (43.2%)
+  Passed through:    258  (56.8%)
+  Total         :    454
 
-  approve rate  ██████████████████░░░░░░ 75.9%
-
-  Auto-approved by tool:
-    Read       504
-    Bash       154
-    ...
+  approve rate  ██████████░░░░░░░░░░░░░░ 43.2%
 ```
 
-Counts come from the `audit_file` (approvals) and `passthrough_file` (passthroughs), classified by each entry's `decision` — so it works whether they're separate files or the legacy single file. A low approval ratio, or a tool dominating the passthrough list, tells you where a new or extended matcher would help. Auditing must be enabled (it is by default after `anumati init`) for there to be anything to count.
+Counts come from the `audit_file` (approvals) and `passthrough_file` (passthroughs), classified by each entry's `decision` — so it works whether they're separate files or the legacy single file. Only **Bash** entries are counted, since that is all anumati vets; any other tool is ignored. A low approval ratio tells you where a new or extended matcher would help. Auditing must be enabled (it is by default after `anumati init`) for there to be anything to count.
 
 ### `anumati apply`
 

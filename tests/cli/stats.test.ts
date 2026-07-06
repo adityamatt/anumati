@@ -46,21 +46,25 @@ describe("statsSources", () => {
 });
 
 describe("computeStats — two-file setup", () => {
-  it("counts allow vs passthrough across both files", () => {
-    writeFileSync(auditPath(), line("Bash", "allow") + line("Read", "allow") + line("Bash", "allow"));
-    writeFileSync(passPath(), line("Bash", "passthrough") + line("Write", "passthrough"));
+  it("counts Bash allow vs passthrough across both files", () => {
+    writeFileSync(auditPath(), line("Bash", "allow") + line("Bash", "allow") + line("Bash", "allow"));
+    writeFileSync(passPath(), line("Bash", "passthrough") + line("Bash", "passthrough"));
     const s = computeStats(twoFileConfig());
     expect(s.allowed).toBe(3);
     expect(s.passthrough).toBe(2);
     expect(s.total).toBe(5);
     expect(s.ratio).toBeCloseTo(0.6);
   });
+});
 
-  it("ranks tools by frequency", () => {
-    writeFileSync(auditPath(), line("Bash", "allow") + line("Bash", "allow") + line("Read", "allow"));
+describe("computeStats — Bash only", () => {
+  it("ignores non-Bash entries entirely", () => {
+    writeFileSync(auditPath(), line("Bash", "allow") + line("Read", "allow") + line("Edit", "allow"));
+    writeFileSync(passPath(), line("Bash", "passthrough") + line("Write", "passthrough"));
     const s = computeStats(twoFileConfig());
-    expect(s.byToolAllowed[0]).toEqual({ tool: "Bash", count: 2 });
-    expect(s.byToolAllowed[1]).toEqual({ tool: "Read", count: 1 });
+    expect(s.allowed).toBe(1); // only the Bash allow
+    expect(s.passthrough).toBe(1); // only the Bash passthrough
+    expect(s.total).toBe(2);
   });
 });
 
@@ -84,15 +88,9 @@ describe("computeStats — edge cases", () => {
   });
 
   it("skips malformed lines", () => {
-    writeFileSync(auditPath(), line("Bash", "allow") + "not json\n" + "\n" + line("Read", "allow"));
+    writeFileSync(auditPath(), line("Bash", "allow") + "not json\n" + "\n" + line("Bash", "allow"));
     const s = computeStats(twoFileConfig());
     expect(s.allowed).toBe(2);
-  });
-
-  it("labels entries with no tool as 'unknown'", () => {
-    writeFileSync(auditPath(), JSON.stringify({ decision: "allow" }) + "\n");
-    const s = computeStats(twoFileConfig());
-    expect(s.byToolAllowed[0]).toEqual({ tool: "unknown", count: 1 });
   });
 });
 
@@ -109,13 +107,14 @@ describe("formatStats", () => {
   });
 
   it("renders counts and ratio", () => {
-    writeFileSync(auditPath(), line("Bash", "allow") + line("Read", "allow") + line("Bash", "allow"));
+    writeFileSync(auditPath(), line("Bash", "allow") + line("Bash", "allow") + line("Bash", "allow"));
     writeFileSync(passPath(), line("Bash", "passthrough"));
     const out = formatStats(computeStats(twoFileConfig()), "/x/permissions.json");
     expect(out).toContain("Auto-approved");
     expect(out).toContain("75.0%");
     expect(out).toContain("Passed through");
   });
+
 });
 
 describe("parseStatsArgs", () => {

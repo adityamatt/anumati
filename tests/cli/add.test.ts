@@ -33,7 +33,7 @@ describe("parseAddArgs", () => {
   });
 
   it("parses --config", () => {
-    const o = parseAddArgs(["safe-read", "--config", "/x/y.json"]);
+    const o = parseAddArgs(["safe-inspect", "--config", "/x/y.json"]);
     expect(o.config).toBe("/x/y.json");
   });
 
@@ -42,7 +42,7 @@ describe("parseAddArgs", () => {
   });
 
   it("throws when --config is missing its value", () => {
-    expect(() => parseAddArgs(["safe-read", "--config"])).toThrow(/requires a value/);
+    expect(() => parseAddArgs(["safe-inspect", "--config"])).toThrow(/requires a value/);
   });
 
   it("throws when a flag value is itself another flag", () => {
@@ -92,9 +92,9 @@ describe("applyAdd", () => {
     expect(read().allow![0].allowed_domains).toEqual(["a.com", "b.com"]);
   });
 
-  it("adds a Read tool for safe-read", () => {
-    const res = applyAdd({ matcher: "safe-read", config: configPath });
-    expect(res.rule.tool).toBe("Read");
+  it("targets the Bash tool for every matcher", () => {
+    const res = applyAdd({ matcher: "safe-inspect", config: configPath });
+    expect(res.rule.tool).toBe("Bash");
   });
 
   it("nests open.allowed_paths for --paths", () => {

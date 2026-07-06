@@ -15,10 +15,6 @@ export interface Stats {
   total: number;
   /** allowed / total, 0 when total is 0. */
   ratio: number;
-  /** allowed count per tool, most-frequent first. */
-  byToolAllowed: Array<{ tool: string; count: number }>;
-  /** passthrough count per tool, most-frequent first. */
-  byToolPassthrough: Array<{ tool: string; count: number }>;
   /** files actually read (deduped, existing). */
   sources: string[];
 }
@@ -47,10 +43,11 @@ export function statsSources(config: Config): string[] {
 
 // Tally allow vs passthrough by reading the log(s) and classifying each line by
 // its `decision` field — robust whether approvals and passthroughs live in one
-// file or two. Malformed lines are skipped.
+// file or two. Malformed lines are skipped. anumati vets Bash only, so only Bash
+// entries are counted; any other tool is ignored.
 export function computeStats(config: Config): Stats {
-  const allowByTool = new Map<string, number>();
-  const passByTool = new Map<string, number>();
+  let allowed = 0;
+  let passthrough = 0;
   const sources: string[] = [];
 
   for (const file of statsSources(config)) {
@@ -71,20 +68,12 @@ export function computeStats(config: Config): Stats {
       } catch {
         continue; // skip malformed line
       }
-      const tool = entry.tool ?? "unknown";
-      const target = entry.decision === "allow" ? allowByTool : passByTool;
-      target.set(tool, (target.get(tool) ?? 0) + 1);
+      if (entry.tool !== "Bash") continue;
+      if (entry.decision === "allow") allowed++;
+      else passthrough++;
     }
   }
 
-  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
-  const rank = (m: Map<string, number>) =>
-    [...m.entries()]
-      .map(([tool, count]) => ({ tool, count }))
-      .sort((a, b) => b.count - a.count || a.tool.localeCompare(b.tool));
-
-  const allowed = sum(allowByTool);
-  const passthrough = sum(passByTool);
   const total = allowed + passthrough;
 
   return {
@@ -92,8 +81,6 @@ export function computeStats(config: Config): Stats {
     passthrough,
     total,
     ratio: total === 0 ? 0 : allowed / total,
-    byToolAllowed: rank(allowByTool),
-    byToolPassthrough: rank(passByTool),
     sources,
   };
 }
@@ -130,21 +117,6 @@ export function formatStats(stats: Stats, configPath: string): string {
   lines.push(`  Total         : ${String(stats.total).padStart(6)}`);
   lines.push("");
   lines.push(`  approve rate  ${bar(stats.ratio)} ${pct(stats.ratio)}`);
-
-  if (stats.byToolAllowed.length > 0) {
-    lines.push("");
-    lines.push("  Auto-approved by tool:");
-    for (const { tool, count } of stats.byToolAllowed) {
-      lines.push(`    ${tool.padEnd(10)} ${count}`);
-    }
-  }
-  if (stats.byToolPassthrough.length > 0) {
-    lines.push("");
-    lines.push("  Passed through by tool:");
-    for (const { tool, count } of stats.byToolPassthrough) {
-      lines.push(`    ${tool.padEnd(10)} ${count}`);
-    }
-  }
 
   return lines.join("\n");
 }
