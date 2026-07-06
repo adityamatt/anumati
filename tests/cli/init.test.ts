@@ -299,9 +299,6 @@ describe("starter config — functional", () => {
   function bash(command: string): HookInput {
     return { session_id: "t", tool_name: "Bash", tool_input: { command }, cwd: dir };
   }
-  function readTool(file_path: string): HookInput {
-    return { session_id: "t", tool_name: "Read", tool_input: { file_path }, cwd: dir };
-  }
 
   it("auto-allows the commands its rules cover", () => {
     applyInit({ config: configPath });
@@ -309,7 +306,6 @@ describe("starter config — functional", () => {
     expect(evaluate(bash("git status"), rules).decision).toBe("allow");
     expect(evaluate(bash("ls -la"), rules).decision).toBe("allow");
     expect(evaluate(bash("npx tsc --noEmit"), rules).decision).toBe("allow");
-    expect(evaluate(readTool("/home/user/file.txt"), rules).decision).toBe("allow");
   });
 
   it("auto-allows python3 using only pre-seeded safe stdlib modules", () => {

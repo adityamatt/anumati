@@ -30,15 +30,17 @@ Bash      ls -la src/app                   # single command
 
 ## Prefer dedicated tools over Bash
 
-The dedicated tools are always cleaner for anumati to reason about than shelling
-out:
+anumati only vets `Bash` commands — `Read`, `Write`, `Edit`, `Grep`, and `Glob`
+are outside its scope and handled by Claude Code directly. Using them instead of
+shelling out keeps file work off the Bash path entirely (nothing for anumati to
+match, no shell edge cases):
 
-| Instead of Bash… | Use the tool | Matcher |
-|---|---|---|
-| `cat` / `head` / `tail` a file | **Read** | `safe-read` |
-| `grep` / `rg` for content | **Grep** | (tool, not Bash) |
-| `find` / `ls` to locate files | **Glob** | (tool, not Bash) |
-| `echo >` / `cat >` to write a file | **Write** / **Edit** | `safe-write` |
+| Instead of Bash… | Use the tool |
+|---|---|
+| `cat` / `head` / `tail` a file | **Read** |
+| `grep` / `rg` for content | **Grep** |
+| `find` / `ls` to locate files | **Glob** |
+| `echo >` / `cat >` to write a file | **Write** / **Edit** |
 
 Reserve Bash for things that genuinely need a shell.
 

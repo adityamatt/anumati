@@ -27,17 +27,6 @@ const NEVER_ACCEPTED_OPS = new Set(["||", "&"]);
 const SUBSTITUTION_RE = /[`$]/;
 
 export function debugDiagnose(input: HookInput): DebugNote | null {
-  if (input.tool_name === "Read") {
-    const fp = input.tool_input.file_path ?? "";
-    if (fp.includes("..")) {
-      return {
-        reason: `Read path contains ".." (path traversal), which safe-read refuses.`,
-        hint: "Use a path without .. segments, or approve this read manually.",
-      };
-    }
-    return null;
-  }
-
   if (input.tool_name !== "Bash") return null;
   const cmd = input.tool_input.command ?? "";
   if (!cmd) return null;

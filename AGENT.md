@@ -11,7 +11,7 @@ stdin (JSON from Claude Code)
         ├── src/matcher.ts  evaluate() — iterates allow rules in order
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / npx-tsc / safe-inspect / safe-read / safe-write / cd / vitest
+        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -89,7 +89,7 @@ Default: `~/.claude/permissions.json`. Pass alternate path as first arg.
 
 ```json
 "PreToolUse": [{
-  "matcher": "Bash|Read|Write|Edit",
+  "matcher": "Bash",
   "hooks": [{
     "type": "command",
     "command": "node /path/to/anumati/dist/index.js /path/to/permissions.json",
@@ -115,8 +115,6 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/branch-list/config --get/…), pipe to safe builtins | — |
 | `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
-| `safe-read` | Read | allow file reads without .. traversal | — |
-| `safe-write` | Write/Edit | allow writes whose resolved path is contained within an allowlisted directory | `allowed_write_paths` |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
 

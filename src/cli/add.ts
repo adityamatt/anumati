@@ -21,9 +21,9 @@ export interface AddResult {
   created: boolean; // whether the config file was newly created
 }
 
-// The tool a fresh rule for this matcher should target.
-function toolForMatcher(matcher: string): string {
-  if (matcher === "safe-read") return "Read";
+// The tool a fresh rule for this matcher should target. anumati vets Bash
+// commands only, so every matcher targets Bash.
+function toolForMatcher(_matcher: string): string {
   return "Bash";
 }
 

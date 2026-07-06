@@ -11,7 +11,6 @@ export interface Rule {
   allowed_repos?: string[];
   allowed_packages?: string[];
   allowed_scripts?: string[];
-  allowed_write_paths?: string[];
   open?: OpenConfig;
   subagent_type?: string;
   desc?: string;

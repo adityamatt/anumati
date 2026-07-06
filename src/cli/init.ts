@@ -11,6 +11,7 @@ import {
   buildHookCommand,
   buildBannerCommand,
   wireAnumatiHook,
+  HOOK_MATCHER,
   type WireResult,
 } from "./settings.js";
 import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
@@ -23,7 +24,6 @@ import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
 // modules have no file/network/exec capability, and any open() in user code is
 // still path-checked separately, so this does not widen filesystem access.
 export const STARTER_RULES: Rule[] = [
-  { tool: "Read", matcher: "safe-read", desc: "File reads (no path traversal)" },
   { tool: "Bash", matcher: "safe-inspect", desc: "Read-only inspection (ls/cat/grep/find/…)" },
   { tool: "Bash", matcher: "git-read", desc: "Read-only git (status/log/diff/…)" },
   { tool: "Bash", matcher: "npx-tsc", desc: "TypeScript type checking (npx tsc --noEmit)" },
@@ -295,7 +295,7 @@ function printResult(result: InitResult): void {
   if (result.hookError) {
     console.log(`\n⚠️  Could not register the PreToolUse hook: ${result.hookError}`);
     console.log(`    The config above was still created. Wire the hook manually:`);
-    console.log(`    "PreToolUse": [{ "matcher": "Bash|Read|Write|Edit",`);
+    console.log(`    "PreToolUse": [{ "matcher": "${HOOK_MATCHER}",`);
     console.log(`      "hooks": [{ "type": "command", "command": "anumati ${prettyPath(result.configPath)}", "timeout": 5 }] }]`);
   } else if (result.hook) {
     const { settingsPath, command, changed } = result.hook;
@@ -308,7 +308,7 @@ function printResult(result: InitResult): void {
     }
   } else {
     console.log(`\nNext: wire the hook into settings.json so Claude Code calls anumati:`);
-    console.log(`    "PreToolUse": [{ "matcher": "Bash|Read|Write|Edit",`);
+    console.log(`    "PreToolUse": [{ "matcher": "${HOOK_MATCHER}",`);
     console.log(`      "hooks": [{ "type": "command", "command": "anumati ${prettyPath(result.configPath)}", "timeout": 5 }] }]`);
   }
 

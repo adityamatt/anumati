@@ -204,8 +204,9 @@ Usage:
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
-  anumati stats                    Show auto-approved vs passed-through counts and ratio, from the
-                                   audit logs. Targets the root config; --project / --config to retarget.
+  anumati stats                    Show auto-approved vs passed-through counts and ratio for Bash
+                                   commands, from the audit logs.
+                                   Targets the root config; --project / --config to retarget.
   anumati --help | -h              Show this help.
   anumati --version | -V           Show the installed version.
 

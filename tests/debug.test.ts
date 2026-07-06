@@ -5,9 +5,6 @@ import type { HookInput } from "../src/types.js";
 function bash(command: string): HookInput {
   return { session_id: "t", tool_name: "Bash", tool_input: { command }, cwd: "/tmp" };
 }
-function read(file_path: string): HookInput {
-  return { session_id: "t", tool_name: "Read", tool_input: { file_path }, cwd: "/tmp" };
-}
 
 describe("debugDiagnose — Bash blockers", () => {
   it("does NOT flag `;` as a hard blocker (some matchers chain safe reads)", () => {
@@ -72,19 +69,10 @@ describe("debugDiagnose — Bash blockers", () => {
   });
 });
 
-describe("debugDiagnose — Read", () => {
-  it("flags path traversal", () => {
-    expect(debugDiagnose(read("/a/../etc/passwd"))?.reason).toContain("traversal");
-  });
-
-  it("returns null for a clean read path", () => {
-    expect(debugDiagnose(read("/home/user/file.txt"))).toBeNull();
-  });
-});
-
 describe("debugDiagnose — other tools", () => {
-  it("returns null for non-Bash/Read tools", () => {
+  it("returns null for non-Bash tools (incl. Read/Write)", () => {
     expect(debugDiagnose({ session_id: "t", tool_name: "Task", tool_input: {} })).toBeNull();
+    expect(debugDiagnose({ session_id: "t", tool_name: "Read", tool_input: { file_path: "/a/../etc/passwd" } })).toBeNull();
   });
 });
 

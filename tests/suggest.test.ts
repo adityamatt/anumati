@@ -5,13 +5,11 @@ import type { HookInput, Rule } from "../src/types.js";
 function bash(command: string, cwd = "/tmp"): HookInput {
   return { session_id: "t", tool_name: "Bash", tool_input: { command }, cwd };
 }
-function read(file_path: string): HookInput {
-  return { session_id: "t", tool_name: "Read", tool_input: { file_path }, cwd: "/tmp" };
-}
 
 describe("suggest — tool gating", () => {
-  it("returns null for non-Bash/Read tools", () => {
+  it("returns null for non-Bash tools", () => {
     expect(suggest({ session_id: "t", tool_name: "Task", tool_input: {} }, [])).toBeNull();
+    expect(suggest({ session_id: "t", tool_name: "Read", tool_input: { file_path: "/a" } }, [])).toBeNull();
     expect(suggest({ session_id: "t", tool_name: "Write", tool_input: { file_path: "/a" } }, [])).toBeNull();
   });
 
@@ -241,19 +239,11 @@ describe("suggest — new rule (no existing matcher)", () => {
   });
 });
 
-describe("suggest — Read tool", () => {
-  it("suggests safe-read for a normal path", () => {
-    const s = suggest(read("/home/user/file.txt"), []);
-    expect(s!.matcher).toBe("safe-read");
-    expect(s!.command).toBe("anumati add safe-read");
-    expect(s!.configDelta).toEqual({ tool: "Read", matcher: "safe-read" });
-  });
-
-  it("does not suggest when safe-read rule already exists", () => {
-    expect(suggest(read("/home/user/file.txt"), [{ tool: "Read", matcher: "safe-read" }])).toBeNull();
-  });
-
-  it("does not suggest for path traversal", () => {
-    expect(suggest(read("/home/../etc/passwd"), [])).toBeNull();
+describe("suggest — Read tool is out of scope", () => {
+  it("never suggests for a Read tool (anumati vets Bash only)", () => {
+    const readInput: HookInput = {
+      session_id: "t", tool_name: "Read", tool_input: { file_path: "/home/user/file.txt" }, cwd: "/tmp",
+    };
+    expect(suggest(readInput, [])).toBeNull();
   });
 });
