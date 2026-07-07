@@ -11,7 +11,7 @@ stdin (JSON from Claude Code)
         ├── src/matcher.ts  evaluate() — iterates allow rules in order
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest
+        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -117,6 +117,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
+| `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`) to a per-service read-only subcommand allowlist (list/describe/get/filter); all writes blocked (+ cd && variant, pipe to builtins) | — |
 
 ## Adding a new named matcher
 
@@ -124,6 +125,14 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 2. Add case in `src/matchers/index.ts` `matchNamed()` switch — unpack from `input`
 3. Add tests in `tests/matchers/<name>.test.ts`
 4. If the command shape is recognizable, teach `src/suggest.ts` to suggest it (add a `suggestNewRule` branch, and a near-miss branch if it has an allowlist param)
+
+For a segment-independent matcher (the command produces output that read-only
+consumers pipe from — cargo/go/git-read/vitest/aws), validate trailing pipe
+segments with `isSafePipeConsumer` from `src/parser/pipe.ts`. Do NOT define a
+local `SAFE_PIPE_BUILTINS` set — the shared consumer allowlist is the single
+source of truth, and keeping the pipe tail a curated consumer set (never another
+arbitrary matched command) is what preserves the "one rule covers the whole
+command" boundary.
 
 ## Suggest engine (src/suggest.ts)
 

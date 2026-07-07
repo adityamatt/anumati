@@ -1,19 +1,7 @@
 import { basename } from "path";
 import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
-
-// Builtins safe to receive vitest output via a pipe.
-const SAFE_PIPE_BUILTINS = new Set([
-  "head",
-  "tail",
-  "grep",
-  "cat",
-  "wc",
-  "less",
-  "sort",
-  "uniq",
-  "rg",
-]);
+import { isSafePipeConsumer } from "../parser/pipe.js";
 
 // Reject file-writing / input redirection (safe stream redirects like
 // 2>/dev/null and 2>&1 are permitted); the parser leaves these in the raw text.
@@ -48,12 +36,6 @@ function isCdSegment(raw: string): boolean {
   return !!argv && argv[0] === "cd" && argv.length === 2;
 }
 
-function isSafePipeSegment(raw: string): boolean {
-  if (hasRedirection(raw)) return false;
-  const argv = tokenize(raw);
-  return !!argv && SAFE_PIPE_BUILTINS.has(basename(argv[0]));
-}
-
 export function matchVitest(command: string): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
@@ -80,10 +62,10 @@ export function matchVitest(command: string): boolean {
   if (!isVitestSegment(segments[index].raw)) return false;
   index++;
 
-  // Remaining segments must be piped safe builtins.
+  // Remaining segments must be piped safe consumers.
   for (let i = index; i < segments.length; i++) {
     if (segments[i - 1].operator !== "|") return false;
-    if (!isSafePipeSegment(segments[i].raw)) return false;
+    if (!isSafePipeConsumer(segments[i].raw)) return false;
   }
 
   return true;

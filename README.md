@@ -129,6 +129,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
+| `aws` | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`) — list/describe/get/filter only; writes blocked (+ `cd … &&` variant, pipe to builtins) | — |
 
 ### Audit levels
 

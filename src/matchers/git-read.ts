@@ -1,5 +1,6 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
+import { isSafePipeConsumer } from "../parser/pipe.js";
 
 // Read-only git subcommands that are safe to allow.
 const READ_SUBCOMMANDS = new Set([
@@ -8,12 +9,6 @@ const READ_SUBCOMMANDS = new Set([
   "shortlog", "tag", "reflog", "cat-file", "symbolic-ref", "whatchanged",
   "show-ref", "rev-list", "name-rev", "var", "count-objects",
   "for-each-ref", "merge-base", "cherry", "diff-tree", "diff-index",
-]);
-
-// Output-processing tools that are safe as pipe targets after a git read.
-const SAFE_PIPE_TARGETS = new Set([
-  "head", "tail", "grep", "egrep", "fgrep", "rg",
-  "cat", "wc", "less", "more", "sort", "uniq", "cut", "column", "nl", "tr",
 ]);
 
 // branch flags that mutate state — reject if any appear.
@@ -142,11 +137,6 @@ function isGitReadSegment(raw: string): boolean {
   }
 }
 
-function isSafePipeTarget(raw: string): boolean {
-  const argv = tokenize(raw);
-  return !!argv && SAFE_PIPE_TARGETS.has(argv[0]);
-}
-
 // Reject file-writing / input redirection in any segment's raw text; safe
 // stream redirects (2>/dev/null, 2>&1, …) are permitted.
 function hasRedirection(raw: string): boolean {
@@ -169,9 +159,9 @@ export function matchGitRead(command: string): boolean {
   // First segment must be an allowed git read command.
   if (!isGitReadSegment(segments[0].raw)) return false;
 
-  // Subsequent segments must be safe pipe targets.
+  // Subsequent segments must be safe pipe consumers.
   for (const seg of segments.slice(1)) {
-    if (!isSafePipeTarget(seg.raw)) return false;
+    if (!isSafePipeConsumer(seg.raw)) return false;
   }
 
   return true;

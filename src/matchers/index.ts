@@ -12,6 +12,7 @@ import { matchCargo } from "./cargo.js";
 import { matchGo } from "./go.js";
 import { matchCd } from "./cd.js";
 import { matchVitest } from "./vitest.js";
+import { matchAws } from "./aws.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -30,6 +31,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "go":           return matchGo(cmd);
     case "cd":           return matchCd(cmd, input.cwd ?? "");
     case "vitest":       return matchVitest(cmd);
+    case "aws":          return matchAws(cmd);
     default:             return false;
   }
 }

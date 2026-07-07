@@ -274,6 +274,10 @@ describe("matchGitRead — pipes", () => {
     expect(matchGitRead("git log | grep foo | head -5")).toBe(true);
   });
 
+  it("git log | jq (shared consumer set now includes jq)", () => {
+    expect(matchGitRead("git log --format=%H | jq -R .")).toBe(true);
+  });
+
   it("blocks pipe to sh", () => {
     expect(matchGitRead("git log | sh")).toBe(false);
   });
