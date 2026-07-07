@@ -30,7 +30,7 @@ function evalCode(argv: string[]): string {
   return idx !== -1 ? (argv[idx + 1] ?? "") : "";
 }
 
-export function matchNodejsPipe(command: string, allowedModules: string[], cwd: string = ""): boolean {
+export function matchNodejsPipe(command: string, allowedModules: string[], cwd: string = "", allowedPaths: string[] = []): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
 
@@ -53,14 +53,14 @@ export function matchNodejsPipe(command: string, allowedModules: string[], cwd: 
     const c = classify(seg.raw);
     switch (c.kind) {
       case "nodejs-e": {
-        if (!isSafeNodejsCode(evalCode(c.argv), allowedModules)) return false;
+        if (!isSafeNodejsCode(evalCode(c.argv), allowedModules, allowedPaths)) return false;
         hasNode = true;
         break;
       }
       case "nodejs-script": {
         const code = readScript(c.argv[1], cwd);
         if (code === null) return false;
-        if (!isSafeNodejsCode(code, allowedModules)) return false;
+        if (!isSafeNodejsCode(code, allowedModules, allowedPaths)) return false;
         hasNode = true;
         break;
       }

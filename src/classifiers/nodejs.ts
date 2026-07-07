@@ -53,6 +53,19 @@ function normalize(mod: string): string {
   return mod.startsWith("node:") ? mod.slice(5) : mod;
 }
 
+// A require()/import specifier is a FILE PATH (not a bare module name) when it
+// begins with "/", "./", or "../" — Node's own rule. `require("./x.json")` reads
+// a file off disk, so such specifiers are path-checked against allowed_paths
+// (mirroring python3-pipe's open() allowlist) rather than the module allowlist.
+function isPathSpecifier(spec: string): boolean {
+  return spec.startsWith("/") || spec.startsWith("./") || spec.startsWith("../");
+}
+
+function pathAllowed(path: string, allowedPaths: string[]): boolean {
+  if (path.includes("..")) return false;
+  return allowedPaths.some((dir) => path.startsWith(dir));
+}
+
 // Scan every standalone `require` token. A `require` must appear as a call with
 // a string-literal argument (`require("path")`); anything else — a bare
 // reference (`const r = require`), a dynamic arg (`require(name)`), or
@@ -152,15 +165,26 @@ export function extractModules(code: string): string[] | null {
   return mods;
 }
 
-export function isSafeNodejsCode(code: string, allowedModules: string[]): boolean {
+export function isSafeNodejsCode(
+  code: string,
+  allowedModules: string[],
+  allowedPaths: string[] = [],
+): boolean {
   for (const pattern of DANGEROUS_BUILTINS) {
     if (pattern.test(code)) return false;
   }
 
-  const mods = extractModules(code);
-  if (mods === null) return false; // dynamic/aliased require or import → block
+  const specs = extractModules(code);
+  if (specs === null) return false; // dynamic/aliased require or import → block
 
-  for (const raw of mods) {
+  for (const raw of specs) {
+    if (isPathSpecifier(raw)) {
+      // A file-path require()/import — read from disk. Allowed only when the
+      // path sits under a configured allowed_paths prefix (and has no `..`).
+      if (allowedPaths.length === 0) return false;
+      if (!pathAllowed(raw, allowedPaths)) return false;
+      continue;
+    }
     const mod = normalize(raw);
     if (ALWAYS_BLOCKED.has(mod)) return false;
     if (!allowedModules.includes(mod)) return false;
