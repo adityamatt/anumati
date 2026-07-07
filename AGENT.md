@@ -40,6 +40,7 @@ interface Rule {
   scheme?: "http" | "https";   // curl — required scheme for allowed_domains (default https)
   allowed_imports?: string[];  // python3-pipe
   allowed_modules?: string[];  // nodejs-pipe
+  // open.allowed_paths — path prefixes for python3 open() AND nodejs file-path require()/import
   allowed_repos?: string[];    // gh
   allowed_packages?: string[]; // pip3-install
   allowed_scripts?: string[];  // npm-script
@@ -112,7 +113,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `curl` | Bash | allow curl to specific domains (https default, or http via `scheme`; + pipe to safe builtins) | `allowed_domains`, `scheme` |
 | `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` (no write methods) | `allowed_repos` |
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins/dynamic open() | `allowed_imports`, `open.allowed_paths` |
-| `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules; fs/network/child_process/vm/os always blocked, no eval/Function/dynamic require | `allowed_modules` |
+| `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules; fs/network/child_process/vm/os always blocked, no eval/Function/dynamic require; file-path require()/import allowed only under open.allowed_paths (path-checked, no `..`) | `allowed_modules`, `open.allowed_paths` |
 | `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create, `&& echo`) | `allowed_packages` |
 | `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` for allowlisted scripts + read-only queries (ls/view/outdated) | `allowed_scripts` |
 | `cargo` | Bash | allow cargo check/build/test/clippy/fmt --check/tree/… (+ cd && variant, pipe to builtins) | — |

@@ -127,3 +127,42 @@ describe("KNOWN_SAFE_MODULES", () => {
     }
   });
 });
+
+describe("isSafeNodejsCode — require() of a file path (allowed_paths)", () => {
+  const PATHS = ["/Users/x/precog/"];
+
+  it("allows requiring a file under an allowed path prefix", () => {
+    expect(isSafeNodejsCode('const l=require("/Users/x/precog/package-lock.json")', [], PATHS)).toBe(true);
+  });
+
+  it("allows a relative ./ path when it resolves under an allowed prefix", () => {
+    // relative specifiers are path-checked verbatim; a matching prefix passes
+    expect(isSafeNodejsCode('require("/Users/x/precog/sub/data.json")', [], PATHS)).toBe(true);
+  });
+
+  it("blocks a file-path require when NO allowed_paths configured", () => {
+    expect(isSafeNodejsCode('require("/Users/x/precog/pkg.json")', ["path"])).toBe(false);
+  });
+
+  it("blocks a path outside the allowlist", () => {
+    expect(isSafeNodejsCode('require("/etc/passwd")', [], PATHS)).toBe(false);
+  });
+
+  it("blocks path traversal even under an allowed prefix", () => {
+    expect(isSafeNodejsCode('require("/Users/x/precog/../../etc/passwd")', [], PATHS)).toBe(false);
+  });
+
+  it("still blocks fs even when allowed_paths is set (no filesystem module backdoor)", () => {
+    expect(isSafeNodejsCode('require("fs")', ["fs"], PATHS)).toBe(false);
+  });
+
+  it("mixes a builtin module and an allowed file path", () => {
+    expect(
+      isSafeNodejsCode('const p=require("path"); const l=require("/Users/x/precog/l.json")', ["path"], PATHS),
+    ).toBe(true);
+  });
+
+  it("blocks ./relative path when allowed_paths only lists absolute prefixes", () => {
+    expect(isSafeNodejsCode('require("./local.json")', [], PATHS)).toBe(false);
+  });
+});

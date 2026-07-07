@@ -21,7 +21,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "curl":         return matchCurl(cmd, rule.allowed_domains ?? [], rule.allowed_imports ?? [], rule.open?.allowed_paths ?? [], rule.scheme ?? "https");
     case "npx-tsc":      return matchNpxTsc(cmd);
     case "python3-pipe": return matchPython3Pipe(cmd, rule.allowed_imports ?? [], rule.open?.allowed_paths ?? [], input.cwd ?? "");
-    case "nodejs-pipe":  return matchNodejsPipe(cmd, rule.allowed_modules ?? [], input.cwd ?? "");
+    case "nodejs-pipe":  return matchNodejsPipe(cmd, rule.allowed_modules ?? [], input.cwd ?? "", rule.open?.allowed_paths ?? []);
     case "gh":           return matchGh(cmd, rule.allowed_repos ?? [], rule.allowed_imports ?? [], rule.open?.allowed_paths ?? []);
     case "pip3-install": return matchPip3Install(cmd, rule.allowed_packages ?? []);
     case "safe-inspect": return matchSafeInspect(cmd);
