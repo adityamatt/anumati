@@ -17,9 +17,34 @@ Because every rule can only ever *allow*, rule order doesn't affect the decision
 
 Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`. A call is approved if a rule in *either* matches.
 
-### One rule must cover the whole command
+### How a command is approved
 
-A command is approved only if a **single** rule's matcher accepts it in full — including every `&&`, `|`, and `;` segment. anumati never stitches multiple rules together to cover different parts of one command, so you can't slip a disallowed command past the gate by chaining it onto an allowed one. For example, with `cargo` and `curl` rules configured, `cargo build && curl https://evil.com` is **not** approved: the `cargo` rule rejects the `curl` segment, the `curl` rule rejects the `cargo` segment, and the call falls through to the permission dialog.
+anumati tries two strategies, in order:
+
+1. **Whole-command** — a single rule's matcher accepts the entire command, including any `|`, `&&`, or `;` it handles within its own vocabulary (e.g. `cargo`'s `cd … && cargo build | grep`).
+2. **Sequential composition** — if no single rule covers everything, the command is split at top-level `&&` and `;` into sub-commands, and it is approved only if **every** sub-command is independently accepted by some rule. For example, `git status && ls -la` is approved when both `git-read` and `safe-inspect` are configured.
+
+```mermaid
+flowchart TD
+    A[Bash command] --> B{A single rule's matcher<br/>accepts the whole command?}
+    B -- yes --> ALLOW([✅ allow])
+    B -- no --> C{Contains a top-level<br/>&#124;&#124; or backgrounding &?}
+    C -- yes --> PASS([⤳ passthrough])
+    C -- no --> D[Split at top-level && and ;<br/>pipes stay glued to their segment]
+    D --> E{More than one<br/>sub-command?}
+    E -- no --> PASS
+    E -- yes --> F[For each sub-command:<br/>does some rule accept it?]
+    F --> G{Every sub-command<br/>approved?}
+    G -- yes --> ALLOW
+    G -- no --> PASS
+```
+
+Crucially, **a disallowed sub-command still fails its own check**, so you can never slip a bad command past the gate by chaining it onto a good one: `git status && rm -rf /` is rejected (nothing approves `rm -rf /`), and `cargo build && curl https://evil.com` is rejected (no rule approves an unlisted curl domain).
+
+Two deliberate limits keep composition safe:
+
+- **Pipes are never split across rules.** A pipe feeds one command's output into the next, so its safety depends on the *receiving* command — only the matcher that owns the pipeline can judge it. `git log | <something>` is handed to a matcher as one unit; it is never satisfied by two different rules. (Coupled cases like `curl … | python3 -c …` are hand-vetted inside a single matcher.)
+- **`||` and backgrounding `&` are not composed** — only the purely sequential `&&` / `;`, where no data flows between segments.
 
 Matchers do understand compound commands within their own safe vocabulary. The `curl` matcher, for instance, allows piping into read-only builtins (`curl https://api.github.com/repos | jq .`), and `cargo`/`go` allow a leading `cd <dir> &&`. But that awareness is scoped to the one matcher — it is never a license to mix segments belonging to different rules.
 

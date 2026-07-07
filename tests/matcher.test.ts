@@ -349,3 +349,46 @@ describe("evaluate — subagent_type rule", () => {
     expect(evaluate(input, [allow]).decision).toBeNull();
   });
 });
+
+describe("evaluate — sequential composition (&& / ;)", () => {
+  const GIT: Rule = { tool: "Bash", matcher: "git-read" };
+  const INSPECT: Rule = { tool: "Bash", matcher: "safe-inspect" };
+  const rules = [GIT, INSPECT];
+
+  it("allows && when every sub-command is independently approved", () => {
+    expect(evaluate(bash("git status && ls -la"), rules).decision).toBe("allow");
+  });
+
+  it("allows ; chains of approved sub-commands", () => {
+    expect(evaluate(bash("git status ; ls ; git log"), rules).decision).toBe("allow");
+  });
+
+  it("labels the composite result rule", () => {
+    const r = evaluate(bash("git status && ls"), rules);
+    expect(r.rule?.desc).toContain("composite");
+  });
+
+  it("keeps pipes inside a sub-command (handed whole to one matcher)", () => {
+    // `git log | grep x` is a single sub-command; `ls` is another.
+    expect(evaluate(bash("git log | grep x && ls"), rules).decision).toBe("allow");
+  });
+
+  it("blocks when ANY sub-command is not approved (chaining a bad command)", () => {
+    expect(evaluate(bash("git status && rm -rf /"), rules).decision).toBeNull();
+    expect(evaluate(bash("ls && npm publish"), rules).decision).toBeNull();
+    expect(evaluate(bash("git status ; ls ; curl https://x.com"), rules).decision).toBeNull();
+  });
+
+  it("does NOT compose across || or backgrounding &", () => {
+    expect(evaluate(bash("git status || rm -rf /"), rules).decision).toBeNull();
+    expect(evaluate(bash("git status & sleep 5"), rules).decision).toBeNull();
+    // even when both sides would individually pass, || / & are not composed
+    expect(evaluate(bash("git status || ls"), rules).decision).toBeNull();
+  });
+
+  it("does NOT split a pipe across matchers", () => {
+    // A pipe from an approved producer into an UNAPPROVED consumer must fail —
+    // the whole `git log | <unknown>` is one sub-command, and no rule accepts it.
+    expect(evaluate(bash("git log | someunknowncmd"), rules).decision).toBeNull();
+  });
+});

@@ -8,7 +8,11 @@ PreToolUse hook for Claude Code. Intercepts tool calls, evaluates them against a
 stdin (JSON from Claude Code)
   └── src/index.ts          CLI entry; routes `add`/`apply` subcommands, else runs the hook
         ├── src/config.ts   defaultConfigPath / projectConfigPath / loadConfig
-        ├── src/matcher.ts  evaluate() — iterates allow rules in order
+        ├── src/matcher.ts  evaluate() — (1) whole-command: first rule whose matcher accepts the
+        │                   full command wins; (2) sequential composition: else split on top-level
+        │                   && / ; and approve iff every sub-command is accepted by some rule.
+        │                   Pipes are kept inside a sub-command (never composed across rules);
+        │                   || and backgrounding & are not composed.
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
         │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws
