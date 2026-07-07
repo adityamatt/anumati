@@ -33,6 +33,31 @@ const READ_ONLY_SUBCOMMANDS: Record<string, Set<string>> = {
     "list-activities",
     "list-tags-for-resource",
   ]),
+  // High-level `aws s3` CLI. ONLY `ls` — it is the sole verb with no local side
+  // effect. cp/sync/mv/rm are excluded: cp/sync/mv are direction-dependent (can
+  // upload), rm deletes. Object downloads go through s3api get-object, which is
+  // itself excluded because it writes a local file.
+  s3: new Set([
+    "ls",
+  ]),
+  // Low-level `aws s3api`. Pure metadata reads only — no get-object (writes a
+  // local file), no put/create/delete/copy.
+  s3api: new Set([
+    "list-buckets",
+    "list-objects",
+    "list-objects-v2",
+    "list-object-versions",
+    "list-multipart-uploads",
+    "head-bucket",
+    "head-object",
+    "get-bucket-location",
+    "get-bucket-versioning",
+    "get-bucket-tagging",
+    "get-bucket-policy",
+    "get-bucket-acl",
+    "get-object-attributes",
+    "get-object-tagging",
+  ]),
 };
 
 function isAwsSegment(raw: string): boolean {
