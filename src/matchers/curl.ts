@@ -2,23 +2,26 @@ import { parseCompound } from "../parser/shell.js";
 import { classify } from "../classifiers/index.js";
 import { isSafePython3Code } from "../classifiers/python3.js";
 
-function extractHostname(token: string): string | null {
+// Extract the hostname of a URL token, but only if it uses the required scheme.
+// Default is https; a rule may opt into http (e.g. for local/internal hosts).
+function extractHostname(token: string, scheme: "http" | "https"): string | null {
+  const wanted = scheme === "http" ? "http:" : "https:";
   try {
     const url = new URL(token);
-    if (url.protocol !== "https:") return null;
+    if (url.protocol !== wanted) return null;
     return url.hostname;
   } catch {
     return null;
   }
 }
 
-function curlDomainAllowed(argv: string[], allowedDomains: string[]): boolean {
-  const urls = argv.slice(1).map(extractHostname).filter((h): h is string => h !== null);
+function curlDomainAllowed(argv: string[], allowedDomains: string[], scheme: "http" | "https"): boolean {
+  const urls = argv.slice(1).map((t) => extractHostname(t, scheme)).filter((h): h is string => h !== null);
   if (urls.length === 0) return false;
   return urls.every(h => allowedDomains.includes(h));
 }
 
-export function matchCurl(command: string, allowedDomains: string[], allowedImports: string[] = [], allowedPaths: string[] = []): boolean {
+export function matchCurl(command: string, allowedDomains: string[], allowedImports: string[] = [], allowedPaths: string[] = [], scheme: "http" | "https" = "https"): boolean {
   if (allowedDomains.length === 0) return false;
 
   const segments = parseCompound(command);
@@ -34,7 +37,7 @@ export function matchCurl(command: string, allowedDomains: string[], allowedImpo
 
     switch (c.kind) {
       case "curl":
-        if (!curlDomainAllowed(c.argv, allowedDomains)) return false;
+        if (!curlDomainAllowed(c.argv, allowedDomains, scheme)) return false;
         hasCurl = true;
         break;
       case "safe-builtin":

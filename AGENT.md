@@ -37,6 +37,7 @@ interface Rule {
   tool?: string;
   matcher?: string;            // named matcher (required — no regex fallback)
   allowed_domains?: string[];  // curl
+  scheme?: "http" | "https";   // curl — required scheme for allowed_domains (default https)
   allowed_imports?: string[];  // python3-pipe
   allowed_modules?: string[];  // nodejs-pipe
   allowed_repos?: string[];    // gh
@@ -108,7 +109,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 
 | Matcher | Tool | Effect | Key param |
 |---|---|---|---|
-| `curl` | Bash | allow curl to specific https domains (+ pipe to safe builtins) | `allowed_domains` |
+| `curl` | Bash | allow curl to specific domains (https default, or http via `scheme`; + pipe to safe builtins) | `allowed_domains`, `scheme` |
 | `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` (no write methods) | `allowed_repos` |
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins/dynamic open() | `allowed_imports`, `open.allowed_paths` |
 | `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules; fs/network/child_process/vm/os always blocked, no eval/Function/dynamic require | `allowed_modules` |

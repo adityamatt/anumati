@@ -127,7 +127,8 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 |-------|---------|-------------|
 | `tool` | all | Tool name to match: `Bash`, `Read`, `Task`, … |
 | `matcher` | all | Named matcher (see table below) — required; there is no regex fallback |
-| `allowed_domains` | `curl` | Hostnames allowed as `https://` curl targets |
+| `allowed_domains` | `curl` | Hostnames allowed as curl targets (scheme per `scheme`, default https) |
+| `scheme` | `curl` | `https` (default) or `http` — the URL scheme required for `allowed_domains`. Use `http` for local/internal hosts; write a second rule for the other scheme |
 | `allowed_imports` | `python3-pipe` | Python modules the code may import |
 | `allowed_modules` | `nodejs-pipe` | Node built-in modules the code may `require`/`import` |
 | `allowed_packages` | `pip3-install` | Packages `pip install` may install (`"*"` = any) |
@@ -141,7 +142,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 
 | Matcher | Tool | Effect | Key param |
 |---|---|---|---|
-| `curl` | Bash | allow `curl` to specific https domains (+ pipe to safe builtins) | `allowed_domains` |
+| `curl` | Bash | allow `curl` to specific domains, https by default or http via `scheme` (+ pipe to safe builtins) | `allowed_domains`, `scheme` |
 | `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` | `allowed_repos` |
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins | `allowed_imports`, `open.allowed_paths` |
 | `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules, no `fs`/network/`child_process`/`eval` | `allowed_modules` |
