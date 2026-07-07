@@ -27,6 +27,7 @@ describe("matchCargo — allowed", () => {
   it("cargo tree | grep serde", () => expect(matchCargo("cargo tree | grep serde")).toBe(true));
   it("cargo tree | head", () => expect(matchCargo("cargo tree | head")).toBe(true));
   it("cargo tree | grep serde | head -n 5", () => expect(matchCargo("cargo tree | grep serde | head -n 5")).toBe(true));
+  it("cargo metadata | jq (shared consumer set)", () => expect(matchCargo("cargo metadata | jq '.packages'")).toBe(true));
   it("cd dir && cargo build | grep warning", () =>
     expect(matchCargo("cd ./mycrate && cargo build | grep warning")).toBe(true));
 });

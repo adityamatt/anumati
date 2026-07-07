@@ -1,6 +1,7 @@
 import { basename } from "path";
 import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
+import { isSafePipeConsumer } from "../parser/pipe.js";
 
 // cargo subcommands that are read-only / build / test / lint and safe to allow
 const ALLOWED_SUBCOMMANDS = new Set([
@@ -21,19 +22,6 @@ const ALLOWED_SUBCOMMANDS = new Set([
   "verify-project",
   "locate-project",
   "pkgid",
-]);
-
-// Builtins safe to receive cargo output via a pipe
-const SAFE_PIPE_BUILTINS = new Set([
-  "head",
-  "tail",
-  "grep",
-  "cat",
-  "wc",
-  "less",
-  "sort",
-  "uniq",
-  "rg",
 ]);
 
 // Reject file-writing / input redirection (safe stream redirects like
@@ -69,12 +57,6 @@ function isCdSegment(raw: string): boolean {
   return !!argv && argv[0] === "cd" && argv.length === 2;
 }
 
-function isSafePipeSegment(raw: string): boolean {
-  if (hasRedirection(raw)) return false;
-  const argv = tokenize(raw);
-  return !!argv && SAFE_PIPE_BUILTINS.has(basename(argv[0]));
-}
-
 export function matchCargo(command: string): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
@@ -102,10 +84,10 @@ export function matchCargo(command: string): boolean {
   if (!isCargoSegment(segments[index].raw)) return false;
   index++;
 
-  // Remaining segments must be piped safe builtins
+  // Remaining segments must be piped safe consumers
   for (let i = index; i < segments.length; i++) {
     if (segments[i - 1].operator !== "|") return false;
-    if (!isSafePipeSegment(segments[i].raw)) return false;
+    if (!isSafePipeConsumer(segments[i].raw)) return false;
   }
 
   return true;
