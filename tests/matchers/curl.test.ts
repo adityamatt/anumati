@@ -25,6 +25,32 @@ describe("matchCurl — simple allow", () => {
   });
 });
 
+describe("matchCurl — scheme", () => {
+  const LOCAL = ["localhost", "127.0.0.1"];
+
+  it("defaults to https (http rejected)", () => {
+    expect(matchCurl("curl -s http://localhost:5173/x", LOCAL)).toBe(false);
+    expect(matchCurl("curl -s https://api.github.com/x", GITHUB)).toBe(true);
+  });
+
+  it("allows http when scheme is http", () => {
+    expect(matchCurl("curl -s http://localhost:5173/src/x.jsx", LOCAL, [], [], "http")).toBe(true);
+    expect(matchCurl("curl -s http://127.0.0.1:8080/api", LOCAL, [], [], "http")).toBe(true);
+  });
+
+  it("an http-scheme rule rejects https (scheme must match exactly)", () => {
+    expect(matchCurl("curl -s https://localhost/x", LOCAL, [], [], "http")).toBe(false);
+  });
+
+  it("an https-scheme rule rejects http", () => {
+    expect(matchCurl("curl -s http://api.github.com/x", GITHUB, [], [], "https")).toBe(false);
+  });
+
+  it("still enforces the domain allowlist under http scheme", () => {
+    expect(matchCurl("curl -s http://evil.com/x", LOCAL, [], [], "http")).toBe(false);
+  });
+});
+
 describe("matchCurl — piped to safe builtins", () => {
   it("allows curl | head", () => {
     expect(matchCurl("curl -s https://raw.githubusercontent.com/foo | head -20", GITHUB)).toBe(true);

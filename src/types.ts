@@ -6,6 +6,13 @@ export interface Rule {
   tool?: string;
   matcher?: string;
   allowed_domains?: string[];
+  /**
+   * URL scheme the `curl` matcher requires for `allowed_domains`. "https"
+   * (default) permits only https:// targets; "http" permits http:// (use for
+   * local/internal hosts). Write two rules to allow both — e.g. one http rule
+   * for localhost and one https rule for external domains.
+   */
+  scheme?: "http" | "https";
   allowed_imports?: string[];
   allowed_modules?: string[];
   allowed_repos?: string[];
