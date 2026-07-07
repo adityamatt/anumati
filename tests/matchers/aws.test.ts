@@ -38,6 +38,25 @@ describe("matchAws — stepfunctions (allow read-only)", () => {
   });
 });
 
+describe("matchAws — s3 / s3api (allow pure reads)", () => {
+  it("s3 ls", () => expect(matchAws("aws s3 ls")).toBe(true));
+  it("s3 ls with a bucket prefix", () => expect(matchAws("aws s3 ls s3://my-bucket/prefix/")).toBe(true));
+  it("s3api list-objects-v2", () => expect(matchAws("aws s3api list-objects-v2 --bucket my-bucket")).toBe(true));
+  it("s3api head-object", () => expect(matchAws("aws s3api head-object --bucket b --key k")).toBe(true));
+  it("s3api get-bucket-location", () => expect(matchAws("aws s3api get-bucket-location --bucket b")).toBe(true));
+});
+
+describe("matchAws — s3 / s3api (block writes & local side effects)", () => {
+  it("s3 cp upload", () => expect(matchAws("aws s3 cp . s3://b/k")).toBe(false));
+  it("s3 cp download (writes local file)", () => expect(matchAws("aws s3 cp s3://b/k .")).toBe(false));
+  it("s3 sync", () => expect(matchAws("aws s3 sync . s3://b")).toBe(false));
+  it("s3 rm", () => expect(matchAws("aws s3 rm s3://b/k")).toBe(false));
+  it("s3 mb (make bucket)", () => expect(matchAws("aws s3 mb s3://b")).toBe(false));
+  it("s3api get-object (writes local file)", () => expect(matchAws("aws s3api get-object --bucket b --key k out.json")).toBe(false));
+  it("s3api put-object", () => expect(matchAws("aws s3api put-object --bucket b --key k")).toBe(false));
+  it("s3api delete-object", () => expect(matchAws("aws s3api delete-object --bucket b --key k")).toBe(false));
+});
+
 describe("matchAws — compound shapes", () => {
   it("cd <dir> && aws logs ...", () => {
     expect(matchAws("cd /tmp && aws logs describe-log-groups --region eu-central-1")).toBe(true);
@@ -75,8 +94,8 @@ describe("matchAws — block writes / mutations", () => {
 });
 
 describe("matchAws — block out-of-scope services", () => {
-  it("s3 (not yet supported) is rejected even for read verbs", () => {
-    expect(matchAws("aws s3 ls")).toBe(false);
+  it("ec2 describe-instances is rejected (service not allowlisted)", () => {
+    expect(matchAws("aws ec2 describe-instances")).toBe(false);
   });
   it("dynamodb get-item is rejected (service not allowlisted)", () => {
     expect(matchAws("aws dynamodb get-item --table-name x")).toBe(false);

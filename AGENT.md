@@ -122,7 +122,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
-| `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`) to a per-service read-only subcommand allowlist (list/describe/get/filter); all writes blocked (+ cd && variant, pipe to builtins) | — |
+| `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`) to a per-service read-only subcommand allowlist (list/describe/get/filter; s3 = `ls` only, s3api = metadata reads, no get-object); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
 
 ## Adding a new named matcher
 
