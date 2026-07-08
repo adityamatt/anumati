@@ -160,6 +160,8 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `sleep`        | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection                                                                                                                                                                         | —                                       |
 | `echo`         | Bash | allow a bare `echo …` (stdout only; file redirect blocked); common as `&& echo "=== … ==="` markers                                                                                                                                               | —                                       |
 | `sed`          | Bash | allow read-only `sed` — print/delete/quit scripts (e.g. `sed -n '1,60p' file`); `-i`/`-f`/`w`/`e`/substitution blocked (+ pipe to builtins)                                                                                                       | —                                       |
+| `jq`           | Bash | allow `jq <filter> [file]` (pure JSON transform; `-f` filter-file blocked; + pipe to builtins)                                                                                                                                                    | —                                       |
+| `test-runner`  | Bash | allow `pytest` / `python -m pytest` / `[npx] jest` (+ `cd … &&`, pipe to builtins); `--watch`/`-u` blocked                                                                                                                                        | —                                       |
 
 ### Audit levels
 

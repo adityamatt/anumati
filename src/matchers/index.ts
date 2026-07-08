@@ -17,6 +17,8 @@ import { matchAws } from "./aws.js";
 import { matchSleep } from "./sleep.js";
 import { matchEcho } from "./echo.js";
 import { matchSed } from "./sed.js";
+import { matchJq } from "./jq.js";
+import { matchTestRunner } from "./test-runner.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -40,6 +42,8 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "sleep":        return matchSleep(cmd);
     case "echo":         return matchEcho(cmd);
     case "sed":          return matchSed(cmd);
+    case "jq":           return matchJq(cmd);
+    case "test-runner":  return matchTestRunner(cmd);
     default:             return false;
   }
 }
