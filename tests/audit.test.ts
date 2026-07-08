@@ -63,6 +63,37 @@ describe("audit — level: all", () => {
   });
 });
 
+describe("audit — passthrough reason", () => {
+  it("records reason_code and reason when a note is passed", () => {
+    audit({ audit_file: TMP, audit_level: "all" }, bashInput, passthroughResult, {
+      code: "no_matcher",
+      reason: 'No matcher covers "curl".',
+    });
+    const [entry] = lines();
+    expect(entry.reason_code).toBe("no_matcher");
+    expect(entry.reason).toContain("curl");
+  });
+
+  it("records the offending sub-command when present", () => {
+    audit({ audit_file: TMP, audit_level: "all" }, bashInput, passthroughResult, {
+      code: "no_matcher",
+      reason: "x",
+      offending: "npm publish",
+    });
+    expect(lines()[0].offending).toBe("npm publish");
+  });
+
+  it("does not add reason fields to an allow entry", () => {
+    audit({ audit_file: TMP, audit_level: "matched" }, bashInput, allowResult, {
+      code: "no_matcher",
+      reason: "should be ignored",
+    });
+    const [entry] = lines();
+    expect(entry.reason_code).toBeUndefined();
+    expect(entry.reason).toBeUndefined();
+  });
+});
+
 describe("audit — passthrough_file routing", () => {
   const PASS = "/tmp/claude-permissions-test-passthrough.json";
   function passLines() {

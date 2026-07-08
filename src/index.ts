@@ -96,15 +96,26 @@ function runHook(): void {
     rootResult = evaluate(input, rootConfig.allow ?? []);
   }
 
+  const approved = projectResult.decision === "allow" || rootResult.decision === "allow";
+
+  // On passthrough, diagnose WHY (against the combined ruleset) so the reason
+  // can be recorded in the audit log. Computed once, reused for logging + display.
+  const passthroughNote = approved
+    ? null
+    : debugDiagnose(input, [
+        ...(projectConfig?.allow ?? []),
+        ...(rootConfig?.allow ?? []),
+      ]);
+
   // Audit each config independently; root only audited when actually consulted
   if (projectConfig) {
-    audit(projectConfig.audit, input, projectResult);
+    audit(projectConfig.audit, input, projectResult, passthroughNote);
   }
   if (rootConfig && projectResult.decision !== "allow") {
-    audit(rootConfig.audit, input, rootResult);
+    audit(rootConfig.audit, input, rootResult, passthroughNote);
   }
 
-  if (projectResult.decision === "allow" || rootResult.decision === "allow") {
+  if (approved) {
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -144,10 +155,10 @@ function runHook(): void {
   }
 
   // No actionable suggestion. In debug mode, explain WHY this fell through so
-  // the user can decide how to expand their config.
-  if (sc.debug && sc.show) {
-    const note = debugDiagnose(input);
-    if (note) emitMessage(formatDebugNote(note).trimEnd());
+  // the user can decide how to expand their config. Reuse the note already
+  // computed for the audit log.
+  if (sc.debug && sc.show && passthroughNote) {
+    emitMessage(formatDebugNote(passthroughNote).trimEnd());
   }
 }
 

@@ -169,6 +169,27 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 
 Audit entries are appended as newline-delimited JSON to `audit_file`. `anumati init` sets this up for you — it scaffolds an empty `anumati-audit.jsonl` next to the config and points `audit_file` at it (pass `--no-audit` to skip). The path is taken verbatim with no `~` expansion, so set an absolute path if you write the config by hand. If `audit_file` is unset, auditing is disabled entirely.
 
+### Passthrough reasons
+
+Every **passthrough** entry (in `passthrough_file`, or `audit_file` at level `all`) is self-explanatory — it records *why* the command was not auto-approved, so you don't have to re-analyze it:
+
+- `reason_code` — a stable, filterable code (see below).
+- `reason` — a one-line human-readable explanation.
+- `offending` — for a composite command (`a && b && c`), the specific sub-command that blocked approval (e.g. `npm publish`), not just the first segment.
+
+| `reason_code` | Meaning |
+|---|---|
+| `shell_substitution` | Contains `$(...)` or backticks — never parsed, for safety |
+| `unparseable` | Could not be parsed (e.g. an unclosed quote) |
+| `unsupported_operator` | Uses `\|\|` or a backgrounding `&` — never composed |
+| `file_redirection` | A segment writes/reads a file (`> out`, `< in`); stream redirects like `2>/dev/null` are fine |
+| `dangerous_command` | Leading command is an interpreter/shell/privileged tool, never auto-approved |
+| `no_matcher` | A (sub-)command that no configured rule covers — add or extend a matcher |
+
+```json
+{"ts":"…","tool":"Bash","command":"git status && npm publish","decision":"passthrough","reason_code":"no_matcher","reason":"No matcher covers \"npm\".","offending":"npm publish"}
+```
+
 ### Passthrough sound
 
 When a call falls through (anumati did not auto-approve it, so Claude Code's own permission flow takes over — often a prompt), anumati plays a short sound to alert you that a call may be waiting. It's **on by default** and configured under `notify`:
