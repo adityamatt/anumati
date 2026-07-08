@@ -15,7 +15,7 @@ stdin (JSON from Claude Code)
         │                   || and backgrounding & are not composed.
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws
+        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws / sleep
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -124,6 +124,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
 | `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`) to a per-service read-only subcommand allowlist (list/describe/get/filter; s3 = `ls` only, s3api = metadata reads, no get-object); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
+| `sleep` | Bash | allow a single bare `sleep <seconds>` (one integer arg); no operators/redirection — chaining is handled by evaluate() composition | — |
 
 ## Adding a new named matcher
 

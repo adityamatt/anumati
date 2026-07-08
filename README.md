@@ -156,6 +156,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
 | `aws` | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`, `s3`/`s3api`) — list/describe/get/filter only; writes and local-write commands (`s3 cp`/`sync`/`rm`, `s3api get-object`) blocked (+ `cd … &&` variant, pipe to builtins) | — |
+| `sleep` | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection | — |
 
 ### Audit levels
 
