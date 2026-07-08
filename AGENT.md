@@ -10,10 +10,10 @@ stdin (JSON from Claude Code)
         ├── src/config.ts   defaultConfigPath / projectConfigPath / loadConfig
         ├── src/matcher.ts  evaluate() — (1) whole-command: first rule whose matcher accepts the
         │                   full command wins; (2) sequential composition: else split on top-level
-        │                   && / ; (and newlines, treated as ;) and approve iff every sub-command
-        │                   is accepted by some rule.
+        │                   && / ; / || (and newlines, treated as ;) and approve iff every
+        │                   sub-command is accepted by some rule.
         │                   Pipes are kept inside a sub-command (never composed across rules);
-        │                   || and backgrounding & are not composed.
+        │                   backgrounding & is not composed (changes execution semantics).
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
         │           └── cargo / go / git-read / git-write / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo / sed

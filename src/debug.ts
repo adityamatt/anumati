@@ -29,11 +29,13 @@ export interface DebugNote {
   offending?: string;
 }
 
-// `||` and a backgrounding `&` are never composed across matchers.
-const NEVER_ACCEPTED_OPS = new Set(["||", "&"]);
+// A backgrounding `&` is never composed across matchers (it detaches a
+// process). `&&`, `;`, and `||` ARE composed, so they are not flagged here —
+// the real blocker in those cases is an uncovered sub-command.
+const NEVER_ACCEPTED_OPS = new Set(["&"]);
 const SUBSTITUTION_RE = /[`$]/;
 
-// Diagnose a SINGLE command (no top-level && / ; / newline composition).
+// Diagnose a SINGLE command (no top-level && / ; / || / newline composition).
 function diagnoseSingle(cmd: string): DebugNote {
   if (SUBSTITUTION_RE.test(cmd)) {
     return {
