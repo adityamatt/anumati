@@ -308,6 +308,25 @@ describe("starter config — functional", () => {
     expect(evaluate(bash("npx tsc --noEmit"), rules).decision).toBe("allow");
   });
 
+  it("auto-allows the zero-config safe matchers seeded by default", () => {
+    applyInit({ config: configPath });
+    const rules = read().allow!;
+    for (const cmd of [
+      "cd src",
+      "sleep 5",
+      'echo "done"',
+      "sed -n '1,20p' file.ts",
+      "jq . data.json",
+      "cargo check",
+      "go test ./...",
+      "npx vitest run",
+      "pytest tests/",
+      "npm run build",
+    ]) {
+      expect(evaluate(bash(cmd), rules).decision, cmd).toBe("allow");
+    }
+  });
+
   it("auto-allows python3 using only pre-seeded safe stdlib modules", () => {
     applyInit({ config: configPath });
     const rules = read().allow!;
