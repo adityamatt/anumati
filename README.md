@@ -133,6 +133,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `allowed_modules` | `nodejs-pipe` | Node built-in modules the code may `require`/`import` |
 | `allowed_packages` | `pip3-install` | Packages `pip install` may install (`"*"` = any) |
 | `allowed_scripts` | `npm-script` | `npm/pnpm/yarn run <script>` names (`"*"` = any) |
+| `allowed_git_ops` | `git-write` | git write subcommands to allow (`add`, `commit`, `branch`, `checkout`, …); network + destructive ops are always blocked |
 | `allowed_repos` | `gh` | `owner/repo` slugs allowed for `gh api repos/...` reads |
 | `open.allowed_paths` | `python3-pipe`, `nodejs-pipe` | Path prefixes a script may read — `open()` (python3) or a file-path `require()`/`import` (nodejs) |
 | `subagent_type` | `Task` | Exact subagent type string |
@@ -150,7 +151,8 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries (+ trailing `&& echo`, pipe to builtins) | `allowed_scripts` |
 | `cargo` | Bash | allow `cargo check/build/test/clippy/fmt --check/tree/…` | — |
 | `go` | Bash | allow `go build/test/vet/fmt/list/doc/env(read)/mod(read)` | — |
-| `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/…) | — |
+| `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/`worktree list`/…) | — |
+| `git-write` | Bash | allow allowlisted git write ops (add/commit/branch/checkout/`worktree add`/…); network (push/pull/fetch) and destructive/force forms (reset --hard, branch -D, --amend, rebase, clean -f, `worktree remove`) always blocked | `allowed_git_ops` |
 | `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant, pipe to builtins) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |

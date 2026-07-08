@@ -303,6 +303,21 @@ describe("matchGitRead — pipes", () => {
   });
 });
 
+describe("matchGitRead — worktree (list only)", () => {
+  it("allows git worktree list", () => {
+    expect(matchGitRead("git worktree list")).toBe(true);
+  });
+  it("blocks git worktree add (a write)", () => {
+    expect(matchGitRead("git worktree add ../x")).toBe(false);
+  });
+  it("blocks git worktree remove", () => {
+    expect(matchGitRead("git worktree remove ../x")).toBe(false);
+  });
+  it("blocks bare git worktree", () => {
+    expect(matchGitRead("git worktree")).toBe(false);
+  });
+});
+
 describe("matchGitRead — block mutating subcommands", () => {
   it("git push", () => {
     expect(matchGitRead("git push")).toBe(false);

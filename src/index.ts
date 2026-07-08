@@ -228,7 +228,8 @@ add flags:
   --packages X[,Y]   packages for the "pip3-install" matcher
   --scripts X[,Y]    script names for the "npm-script" matcher
   --repos X[,Y]      owner/repo slugs for the "gh" matcher
-  --paths X[,Y]      open() path prefixes for the "python3-pipe" matcher
+  --paths X[,Y]      open() path prefixes for the "python3-pipe"/"nodejs-pipe" matchers
+  --git-ops X[,Y]    git write subcommands for the "git-write" matcher (add,commit,branch,…)
   --config <path>    target a specific config file (default: ~/.claude/permissions.json)
 
 Config cascade: a project config at <cwd>/.claude/permissions.json is checked

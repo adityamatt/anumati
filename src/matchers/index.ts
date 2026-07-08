@@ -7,6 +7,7 @@ import { matchGh } from "./gh.js";
 import { matchPip3Install } from "./pip3-install.js";
 import { matchSafeInspect } from "./safe-inspect.js";
 import { matchGitRead } from "./git-read.js";
+import { matchGitWrite } from "./git-write.js";
 import { matchNpmScript } from "./npm-script.js";
 import { matchCargo } from "./cargo.js";
 import { matchGo } from "./go.js";
@@ -28,6 +29,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "pip3-install": return matchPip3Install(cmd, rule.allowed_packages ?? []);
     case "safe-inspect": return matchSafeInspect(cmd);
     case "git-read":     return matchGitRead(cmd);
+    case "git-write":    return matchGitWrite(cmd, rule.allowed_git_ops ?? []);
     case "npm-script":   return matchNpmScript(cmd, rule.allowed_scripts ?? []);
     case "cargo":        return matchCargo(cmd);
     case "go":           return matchGo(cmd);

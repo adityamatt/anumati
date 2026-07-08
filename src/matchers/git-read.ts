@@ -9,6 +9,7 @@ const READ_SUBCOMMANDS = new Set([
   "shortlog", "tag", "reflog", "cat-file", "symbolic-ref", "whatchanged",
   "show-ref", "rev-list", "name-rev", "var", "count-objects",
   "for-each-ref", "merge-base", "cherry", "diff-tree", "diff-index",
+  "worktree",
 ]);
 
 // branch flags that mutate state — reject if any appear.
@@ -114,6 +115,12 @@ function isAllowedReflog(args: string[]): boolean {
   return args[0] === "show";
 }
 
+function isAllowedWorktree(args: string[]): boolean {
+  // Only `git worktree list` is a read. add/remove/prune/move/lock/unlock/repair
+  // all mutate — those go through git-write (add) or are blocked (remove/prune).
+  return args[0] === "list";
+}
+
 function isGitReadSegment(raw: string): boolean {
   const argv = tokenize(raw);
   if (!argv || argv[0] !== "git") return false;
@@ -133,6 +140,7 @@ function isGitReadSegment(raw: string): boolean {
     case "stash": return isAllowedStash(args);
     case "remote": return isAllowedRemote(args);
     case "reflog": return isAllowedReflog(args);
+    case "worktree": return isAllowedWorktree(args);
     default: return true;
   }
 }
