@@ -3,6 +3,27 @@ import { matchNpmScript } from "../../src/matchers/npm-script.js";
 
 const SCRIPTS = ["build", "test", "lint", "typecheck"];
 
+describe("matchNpmScript — pipe to consumers", () => {
+  it("allows npm run build | tail", () => {
+    expect(matchNpmScript("npm run build | tail -1", SCRIPTS)).toBe(true);
+  });
+  it("allows npm run build 2>&1 | tail", () => {
+    expect(matchNpmScript("npm run build 2>&1 | tail -1", SCRIPTS)).toBe(true);
+  });
+  it("allows npm run build with a bare 2>&1", () => {
+    expect(matchNpmScript("npm run build 2>&1", SCRIPTS)).toBe(true);
+  });
+  it("blocks pipe to an unsafe consumer", () => {
+    expect(matchNpmScript("npm run build | sh", SCRIPTS)).toBe(false);
+  });
+  it("blocks a file redirect", () => {
+    expect(matchNpmScript("npm run build > out.txt", SCRIPTS)).toBe(false);
+  });
+  it("still allows -- passthrough args", () => {
+    expect(matchNpmScript("npm run build -- --flag", SCRIPTS)).toBe(true);
+  });
+});
+
 describe("matchNpmScript — run scripts (allowlisted)", () => {
   it("allows npm run build", () => {
     expect(matchNpmScript("npm run build", SCRIPTS)).toBe(true);

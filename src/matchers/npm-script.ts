@@ -1,5 +1,6 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
+import { isSafePipeConsumer } from "../parser/pipe.js";
 
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn"]);
 
@@ -77,10 +78,18 @@ function isEchoSegment(raw: string): boolean {
   return !!argv && argv[0] === "echo";
 }
 
+// A safe stream redirect (2>&1, >/dev/null, …) survives tokenization as a
+// trailing argv token; drop such tokens so the argv checks below see just the
+// command words. Unsafe (file) redirects are already rejected by hasRedirection.
+function stripStreamRedirects(argv: string[]): string[] {
+  return argv.filter((a) => !/^(\d*|&)?>>?/.test(a) && a !== "&1" && a !== "&2");
+}
+
 function isWorkSegment(raw: string, allowedScripts: string[]): boolean {
   if (hasRedirection(raw)) return false;
-  const argv = tokenize(raw);
-  if (!argv) return false;
+  const tokens = tokenize(raw);
+  if (!tokens) return false;
+  const argv = stripStreamRedirects(tokens);
   if (isReadonlyQuerySegment(argv)) return true;
   if (isRunScriptSegment(argv, allowedScripts)) return true;
   return false;
@@ -90,17 +99,26 @@ export function matchNpmScript(command: string, allowedScripts: string[]): boole
   const segments = parseCompound(command);
   if (!segments) return false;
 
-  // All operators must be &&
+  // Only && (between work/echo) and | (piping into safe consumers) are allowed.
   for (const seg of segments) {
-    if (seg.operator !== null && seg.operator !== "&&") return false;
+    if (seg.operator !== null && seg.operator !== "&&" && seg.operator !== "|") return false;
   }
 
   let hasWork = false; // must have at least one real work segment
   let seenEcho = false;
 
-  for (const seg of segments) {
-    if (seenEcho) return false; // echo must be last
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
 
+    // A segment reached via a pipe must be a safe read-only consumer (e.g.
+    // `npm run build | tail`). This applies to any segment whose predecessor
+    // was joined with `|`.
+    if (i > 0 && segments[i - 1].operator === "|") {
+      if (!isSafePipeConsumer(seg.raw)) return false;
+      continue;
+    }
+
+    if (seenEcho) return false; // echo must be last (before any pipe)
     if (hasRedirection(seg.raw)) return false;
 
     if (isEchoSegment(seg.raw)) {
