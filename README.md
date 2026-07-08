@@ -1,7 +1,5 @@
 # anumati
 
-*अनुमति — Sanskrit/Hindi for "permission"*
-
 A `PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows safe **Bash commands** based on a JSON config of **named matchers** — so you stop getting prompted for the same commands repeatedly. When a command falls through, anumati can **suggest** the exact config change that would auto-approve it next time, so your config builds itself from real usage.
 
 **Scope: Bash only.** anumati deliberately vets only `Bash` tool calls — deterministic vetting of shell commands is the hard problem it exists to solve. `Read`, `Write`, and `Edit` are left to Claude Code's own permission flow (path allowlists in `settings.json`, accept-edits mode), which already handles file-path safety well. The hook is registered for `Bash` alone.
@@ -13,9 +11,9 @@ Every time Claude Code is about to run a **Bash** command, this hook intercepts 
 1. **A rule matches** → the call is auto-approved, with no prompt.
 2. **No rule matches** → Claude Code shows its normal permission dialog, and anumati surfaces a 💡 suggestion (via the hook's `systemMessage`) showing how to allow it next time.
 
-Because every rule can only ever *allow*, rule order doesn't affect the decision — if any rule matches, the call is approved. (Internally the first match wins and short-circuits, which is what gets recorded in the audit log.)
+Because every rule can only ever _allow_, rule order doesn't affect the decision — if any rule matches, the call is approved. (Internally the first match wins and short-circuits, which is what gets recorded in the audit log.)
 
-Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`. A call is approved if a rule in *either* matches.
+Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked first, then your global `~/.claude/permissions.json`. A call is approved if a rule in _either_ matches.
 
 ### How a command is approved
 
@@ -39,7 +37,7 @@ Crucially, **a disallowed sub-command still fails its own check**, so you can ne
 
 One deliberate limit keeps composition safe:
 
-- **Pipes are never split across rules.** A pipe feeds one command's output into the next, so its safety depends on the *receiving* command — only the matcher that owns the pipeline can judge it. `git log | <something>` is handed to a matcher as one unit; it is never satisfied by two different rules. (Coupled cases like `curl … | python3 -c …` are hand-vetted inside a single matcher.)
+- **Pipes are never split across rules.** A pipe feeds one command's output into the next, so its safety depends on the _receiving_ command — only the matcher that owns the pipeline can judge it. `git log | <something>` is handed to a matcher as one unit; it is never satisfied by two different rules. (Coupled cases like `curl … | python3 -c …` are hand-vetted inside a single matcher.)
 
 The sequential separators `&&`, `;`, `||`, and `&` all compose — including a background `&`. Running independently-approved commands in parallel grants no capability that running them in sequence wouldn't, so `&` is treated like the others (a bare trailing `cmd &` is approved when `cmd` is).
 
@@ -87,7 +85,11 @@ Prefer to do it by hand? Write the config yourself — a fuller example:
       "allowed_domains": ["raw.githubusercontent.com", "api.github.com"],
       "desc": "GitHub reads"
     },
-    { "tool": "Bash", "matcher": "npx-tsc", "desc": "TypeScript type checking" },
+    {
+      "tool": "Bash",
+      "matcher": "npx-tsc",
+      "desc": "TypeScript type checking"
+    },
     { "tool": "Bash", "matcher": "git-read", "desc": "Read-only git" }
   ]
 }
@@ -120,73 +122,81 @@ Prefer to do it by hand? Write the config yourself — a fuller example:
 
 Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` selects a named matcher; the `allowed_*` fields parameterize it.
 
-| Field | Used by | Description |
-|-------|---------|-------------|
-| `tool` | all | Tool name to match: `Bash`, `Read`, `Task`, … |
-| `matcher` | all | Named matcher (see table below) — required; there is no regex fallback |
-| `allowed_domains` | `curl` | Hostnames allowed as curl targets (scheme per `scheme`, default https) |
-| `scheme` | `curl` | `https` (default) or `http` — the URL scheme required for `allowed_domains`. Use `http` for local/internal hosts; write a second rule for the other scheme |
-| `allowed_imports` | `python3-pipe` | Python modules the code may import |
-| `allowed_modules` | `nodejs-pipe` | Node built-in modules the code may `require`/`import` |
-| `allowed_packages` | `pip3-install` | Packages `pip install` may install (`"*"` = any) |
-| `allowed_scripts` | `npm-script` | `npm/pnpm/yarn run <script>` names (`"*"` = any) |
-| `allowed_git_ops` | `git-write` | git write subcommands to allow (`add`, `commit`, `branch`, `checkout`, …); network + destructive ops are always blocked |
-| `allowed_repos` | `gh` | `owner/repo` slugs allowed for `gh api repos/...` reads |
-| `open.allowed_paths` | `python3-pipe`, `nodejs-pipe` | Path prefixes a script may read — `open()` (python3) or a file-path `require()`/`import` (nodejs) |
-| `subagent_type` | `Task` | Exact subagent type string |
-| `desc` | all | Human-readable note, logged on allow |
+| Field                | Used by                       | Description                                                                                                                                                |
+| -------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool`               | all                           | Tool name to match: `Bash`, `Read`, `Task`, …                                                                                                              |
+| `matcher`            | all                           | Named matcher (see table below) — required; there is no regex fallback                                                                                     |
+| `allowed_domains`    | `curl`                        | Hostnames allowed as curl targets (scheme per `scheme`, default https)                                                                                     |
+| `scheme`             | `curl`                        | `https` (default) or `http` — the URL scheme required for `allowed_domains`. Use `http` for local/internal hosts; write a second rule for the other scheme |
+| `allowed_imports`    | `python3-pipe`                | Python modules the code may import                                                                                                                         |
+| `allowed_modules`    | `nodejs-pipe`                 | Node built-in modules the code may `require`/`import`                                                                                                      |
+| `allowed_packages`   | `pip3-install`                | Packages `pip install` may install (`"*"` = any)                                                                                                           |
+| `allowed_scripts`    | `npm-script`                  | `npm/pnpm/yarn run <script>` names (`"*"` = any)                                                                                                           |
+| `allowed_git_ops`    | `git-write`                   | git write subcommands to allow (`add`, `commit`, `branch`, `checkout`, …); network + destructive ops are always blocked                                    |
+| `allowed_repos`      | `gh`                          | `owner/repo` slugs allowed for `gh api repos/...` reads                                                                                                    |
+| `open.allowed_paths` | `python3-pipe`, `nodejs-pipe` | Path prefixes a script may read — `open()` (python3) or a file-path `require()`/`import` (nodejs)                                                          |
+| `subagent_type`      | `Task`                        | Exact subagent type string                                                                                                                                 |
+| `desc`               | all                           | Human-readable note, logged on allow                                                                                                                       |
 
 ### Available matchers
 
-| Matcher | Tool | Effect | Key param |
-|---|---|---|---|
-| `curl` | Bash | allow `curl` to specific domains, https by default or http via `scheme` (+ pipe to safe builtins) | `allowed_domains`, `scheme` |
-| `gh` | Bash | allow read-only `gh api repos/<owner/repo>/...` | `allowed_repos` |
-| `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins | `allowed_imports`, `open.allowed_paths` |
-| `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules, no `fs`/network/`child_process`/`eval`; a file-path `require()` is allowed only under `open.allowed_paths` | `allowed_modules`, `open.allowed_paths` |
-| `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create) | `allowed_packages` |
-| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries (+ trailing `&& echo`, pipe to builtins) | `allowed_scripts` |
-| `cargo` | Bash | allow `cargo check/build/test/clippy/fmt --check/tree/…` | — |
-| `go` | Bash | allow `go build/test/vet/fmt/list/doc/env(read)/mod(read)` | — |
-| `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/`worktree list`/…) | — |
-| `git-write` | Bash | allow allowlisted git write ops (add/commit/branch/checkout/`worktree add`/…); network (push/pull/fetch) and destructive/force forms (reset --hard, branch -D, --amend, rebase, clean -f, `worktree remove`) always blocked | `allowed_git_ops` |
-| `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant, pipe to builtins) | — |
-| `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
-| `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
-| `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
-| `aws` | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`, `s3`/`s3api`) — list/describe/get/filter only; writes and local-write commands (`s3 cp`/`sync`/`rm`, `s3api get-object`) blocked (+ `cd … &&` variant, pipe to builtins) | — |
-| `sleep` | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection | — |
-| `echo` | Bash | allow a bare `echo …` (stdout only; file redirect blocked); common as `&& echo "=== … ==="` markers | — |
-| `sed` | Bash | allow read-only `sed` — print/delete/quit scripts (e.g. `sed -n '1,60p' file`); `-i`/`-f`/`w`/`e`/substitution blocked (+ pipe to builtins) | — |
+| Matcher        | Tool | Effect                                                                                                                                                                                                                                            | Key param                               |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `curl`         | Bash | allow `curl` to specific domains, https by default or http via `scheme` (+ pipe to safe builtins)                                                                                                                                                 | `allowed_domains`, `scheme`             |
+| `gh`           | Bash | allow read-only `gh api repos/<owner/repo>/...`                                                                                                                                                                                                   | `allowed_repos`                         |
+| `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins                                                                                                                                                                         | `allowed_imports`, `open.allowed_paths` |
+| `nodejs-pipe`  | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules, no `fs`/network/`child_process`/`eval`; a file-path `require()` is allowed only under `open.allowed_paths`                                                                         | `allowed_modules`, `open.allowed_paths` |
+| `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create)                                                                                                                                                                                  | `allowed_packages`                      |
+| `npm-script`   | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries (+ trailing `&& echo`, pipe to builtins)                                                                                                                                                   | `allowed_scripts`                       |
+| `cargo`        | Bash | allow `cargo check/build/test/clippy/fmt --check/tree/…`                                                                                                                                                                                          | —                                       |
+| `go`           | Bash | allow `go build/test/vet/fmt/list/doc/env(read)/mod(read)`                                                                                                                                                                                        | —                                       |
+| `git-read`     | Bash | allow read-only git subcommands (status/log/diff/show/`worktree list`/…)                                                                                                                                                                          | —                                       |
+| `git-write`    | Bash | allow allowlisted git write ops (add/commit/branch/checkout/`worktree add`/…); network (push/pull/fetch) and destructive/force forms (reset --hard, branch -D, --amend, rebase, clean -f, `worktree remove`) always blocked                       | `allowed_git_ops`                       |
+| `npx-tsc`      | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant, pipe to builtins)                                                                                                                                                                                  | —                                       |
+| `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…)                                                                                                                                                                                       | —                                       |
+| `cd`           | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder                                                                                                                                                                         | —                                       |
+| `vitest`       | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked                                                                                                                                                | —                                       |
+| `aws`          | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`, `s3`/`s3api`) — list/describe/get/filter only; writes and local-write commands (`s3 cp`/`sync`/`rm`, `s3api get-object`) blocked (+ `cd … &&` variant, pipe to builtins) | —                                       |
+| `sleep`        | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection                                                                                                                                                                         | —                                       |
+| `echo`         | Bash | allow a bare `echo …` (stdout only; file redirect blocked); common as `&& echo "=== … ==="` markers                                                                                                                                               | —                                       |
+| `sed`          | Bash | allow read-only `sed` — print/delete/quit scripts (e.g. `sed -n '1,60p' file`); `-i`/`-f`/`w`/`e`/substitution blocked (+ pipe to builtins)                                                                                                       | —                                       |
 
 ### Audit levels
 
-| Level | Behavior |
-|-------|----------|
-| `off` | No logging |
-| `matched` | Log only allow hits (default) |
-| `all` | Log everything, including passthroughs |
+| Level     | Behavior                               |
+| --------- | -------------------------------------- |
+| `off`     | No logging                             |
+| `matched` | Log only allow hits (default)          |
+| `all`     | Log everything, including passthroughs |
 
 Audit entries are appended as newline-delimited JSON to `audit_file`. `anumati init` sets this up for you — it scaffolds an empty `anumati-audit.jsonl` next to the config and points `audit_file` at it (pass `--no-audit` to skip). The path is taken verbatim with no `~` expansion, so set an absolute path if you write the config by hand. If `audit_file` is unset, auditing is disabled entirely.
 
 ### Passthrough reasons
 
-Every **passthrough** entry (in `passthrough_file`, or `audit_file` at level `all`) is self-explanatory — it records *why* the command was not auto-approved, so you don't have to re-analyze it:
+Every **passthrough** entry (in `passthrough_file`, or `audit_file` at level `all`) is self-explanatory — it records _why_ the command was not auto-approved, so you don't have to re-analyze it:
 
 - `reason_code` — a stable, filterable code (see below).
 - `reason` — a one-line human-readable explanation.
 - `offending` — for a composite command (`a && b && c`), the specific sub-command that blocked approval (e.g. `npm publish`), not just the first segment.
 
-| `reason_code` | Meaning |
-|---|---|
-| `shell_substitution` | Contains `$(...)` or backticks — never parsed, for safety |
-| `unparseable` | Could not be parsed (e.g. an unclosed quote) |
-| `file_redirection` | A segment writes/reads a file (`> out`, `< in`); stream redirects like `2>/dev/null` are fine |
-| `dangerous_command` | Leading command is an interpreter/shell/privileged tool, never auto-approved |
-| `no_matcher` | A (sub-)command that no configured rule covers — add or extend a matcher |
+| `reason_code`        | Meaning                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `shell_substitution` | Contains `$(...)` or backticks — never parsed, for safety                                     |
+| `unparseable`        | Could not be parsed (e.g. an unclosed quote)                                                  |
+| `file_redirection`   | A segment writes/reads a file (`> out`, `< in`); stream redirects like `2>/dev/null` are fine |
+| `dangerous_command`  | Leading command is an interpreter/shell/privileged tool, never auto-approved                  |
+| `no_matcher`         | A (sub-)command that no configured rule covers — add or extend a matcher                      |
 
 ```json
-{"ts":"…","tool":"Bash","command":"git status && npm publish","decision":"passthrough","reason_code":"no_matcher","reason":"No matcher covers \"npm\".","offending":"npm publish"}
+{
+  "ts": "…",
+  "tool": "Bash",
+  "command": "git status && npm publish",
+  "decision": "passthrough",
+  "reason_code": "no_matcher",
+  "reason": "No matcher covers \"npm\".",
+  "offending": "npm publish"
+}
 ```
 
 ### Passthrough sound
@@ -202,12 +212,12 @@ When a call falls through (anumati did not auto-approve it, so Claude Code's own
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `sound` | `false` to silence the passthrough alert. Default: `true`. |
+| Field           | Description                                                                                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sound`         | `false` to silence the passthrough alert. Default: `true`.                                                                                                                                  |
 | `sound_command` | Override the command played. Array is argv; a string is split on whitespace. When unset, a per-platform default is used: `afplay` (macOS), `paplay` (Linux), a PowerShell `beep` (Windows). |
 
-The player is spawned detached and fire-and-forget — it never blocks the hook, never affects the permission decision, and a missing player just makes no noise. Note the sound fires on every *passthrough*, which is not always a visible prompt: if the tool is already allowlisted in Claude Code's own settings, the call proceeds silently but the sound still plays.
+The player is spawned detached and fire-and-forget — it never blocks the hook, never affects the permission decision, and a missing player just makes no noise. Note the sound fires on every _passthrough_, which is not always a visible prompt: if the tool is already allowlisted in Claude Code's own settings, the call proceeds silently but the sound still plays.
 
 ## Suggestions — let the config build itself
 
@@ -226,7 +236,7 @@ Suggestions are also appended to `~/.claude/anumati-suggestions.jsonl` so you ca
 
 ## Command-style guide for the LLM
 
-The complement to matchers is teaching the agent to *emit* approvable commands
+The complement to matchers is teaching the agent to _emit_ approvable commands
 in the first place — one command per call, no stray redirections or `echo`
 scaffolding, dedicated tools over shelling out.
 
@@ -337,12 +347,12 @@ Tune behavior with an optional `suggest` block (all fields optional):
 }
 ```
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `enabled` | `true` | Generate suggestions on passthrough |
-| `show` | `true` | Surface the 💡 suggestion to the user (via the hook's `systemMessage`, shown with the permission prompt) |
-| `file` | `~/.claude/anumati-suggestions.jsonl` | Where suggestions accumulate |
-| `debug` | `false` | When a command falls through and *no* suggestion applies, print a 🔍 note explaining **why** it wasn't auto-approved |
+| Field     | Default                               | Description                                                                                                          |
+| --------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `enabled` | `true`                                | Generate suggestions on passthrough                                                                                  |
+| `show`    | `true`                                | Surface the 💡 suggestion to the user (via the hook's `systemMessage`, shown with the permission prompt)             |
+| `file`    | `~/.claude/anumati-suggestions.jsonl` | Where suggestions accumulate                                                                                         |
+| `debug`   | `false`                               | When a command falls through and _no_ suggestion applies, print a 🔍 note explaining **why** it wasn't auto-approved |
 
 ### Debug mode — why didn't this get approved?
 
