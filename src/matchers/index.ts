@@ -16,6 +16,7 @@ import { matchVitest } from "./vitest.js";
 import { matchAws } from "./aws.js";
 import { matchSleep } from "./sleep.js";
 import { matchEcho } from "./echo.js";
+import { matchSed } from "./sed.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -38,6 +39,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "aws":          return matchAws(cmd);
     case "sleep":        return matchSleep(cmd);
     case "echo":         return matchEcho(cmd);
+    case "sed":          return matchSed(cmd);
     default:             return false;
   }
 }

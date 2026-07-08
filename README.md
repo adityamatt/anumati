@@ -160,6 +160,7 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `aws` | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`, `s3`/`s3api`) — list/describe/get/filter only; writes and local-write commands (`s3 cp`/`sync`/`rm`, `s3api get-object`) blocked (+ `cd … &&` variant, pipe to builtins) | — |
 | `sleep` | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection | — |
 | `echo` | Bash | allow a bare `echo …` (stdout only; file redirect blocked); common as `&& echo "=== … ==="` markers | — |
+| `sed` | Bash | allow read-only `sed` — print/delete/quit scripts (e.g. `sed -n '1,60p' file`); `-i`/`-f`/`w`/`e`/substitution blocked (+ pipe to builtins) | — |
 
 ### Audit levels
 

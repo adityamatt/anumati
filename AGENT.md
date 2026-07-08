@@ -16,7 +16,7 @@ stdin (JSON from Claude Code)
         │                   || and backgrounding & are not composed.
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / git-write / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo
+        │           └── cargo / go / git-read / git-write / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo / sed
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -124,6 +124,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `git-write` | Bash | allow allowlisted git write ops (single command); NETWORK_OPS (push/pull/fetch/clone/remote) + DESTRUCTIVE_OPS (reset/rebase/clean/gc/…) + dangerous flags (--force/--hard/-D/--amend) hard-blocked regardless of allowlist; `worktree` restricted to the `add` sub-subcommand (remove/prune/move blocked); chaining via evaluate() composition | `allowed_git_ops` |
 | `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant, pipe to consumers) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
+| `sed` | Bash | allow read-only sed: strict script grammar of `[N[,M]]` addresses + p/d/q/= commands only; reject `-i`/`--in-place`/`-f`/`w`/`W`/`e`/`s///`; unknown flags rejected (+ pipe to consumers) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
 | `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`) to a per-service read-only subcommand allowlist (list/describe/get/filter; s3 = `ls` only, s3api = metadata reads, no get-object); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
