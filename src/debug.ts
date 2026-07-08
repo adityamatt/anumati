@@ -12,7 +12,6 @@ import { evaluate, decomposeSequential } from "./matcher.js";
 export type PassthroughCode =
   | "shell_substitution" // contains $(...) or backticks — never parsed
   | "unparseable" // could not be parsed (e.g. unclosed quote)
-  | "unsupported_operator" // ||, or a backgrounding & — never composed
   | "file_redirection" // redirect that writes/reads a file
   | "dangerous_command" // interpreter/shell/privileged leading command
   | "no_matcher" // a (sub-)command no configured rule covers
@@ -29,13 +28,10 @@ export interface DebugNote {
   offending?: string;
 }
 
-// A backgrounding `&` is never composed across matchers (it detaches a
-// process). `&&`, `;`, and `||` ARE composed, so they are not flagged here —
-// the real blocker in those cases is an uncovered sub-command.
-const NEVER_ACCEPTED_OPS = new Set(["&"]);
 const SUBSTITUTION_RE = /[`$]/;
 
-// Diagnose a SINGLE command (no top-level && / ; / || / newline composition).
+// Diagnose a SINGLE command (composable operators &&/;/||/& have already been
+// split out by debugDiagnose before this is called).
 function diagnoseSingle(cmd: string): DebugNote {
   if (SUBSTITUTION_RE.test(cmd)) {
     return {
@@ -50,15 +46,9 @@ function diagnoseSingle(cmd: string): DebugNote {
     return { code: "unparseable", reason: "Command could not be parsed (an unclosed quote, most likely)." };
   }
 
-  const blockedOp = segments.find((s) => s.operator !== null && NEVER_ACCEPTED_OPS.has(s.operator));
-  if (blockedOp) {
-    return {
-      code: "unsupported_operator",
-      reason: `Command chains segments with "${blockedOp.operator}", which no matcher accepts (it means independent commands).`,
-      hint: "Run the segments as separate commands so each can be matched on its own.",
-    };
-  }
-
+  // Note: all operators (&&/;/||/&) now compose, so there is no "unsupported
+  // operator" branch here — a composite command is decomposed by debugDiagnose
+  // and the offending sub-command is diagnosed individually below.
   const redirSeg = segments.find((s) => hasUnsafeRedirection(s.raw));
   if (redirSeg) {
     return {
