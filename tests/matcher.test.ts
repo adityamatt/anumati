@@ -350,7 +350,7 @@ describe("evaluate — subagent_type rule", () => {
   });
 });
 
-describe("evaluate — sequential composition (&& / ;)", () => {
+describe("evaluate — sequential composition (&& / ; / ||)", () => {
   const GIT: Rule = { tool: "Bash", matcher: "git-read" };
   const INSPECT: Rule = { tool: "Bash", matcher: "safe-inspect" };
   const rules = [GIT, INSPECT];
@@ -379,11 +379,20 @@ describe("evaluate — sequential composition (&& / ;)", () => {
     expect(evaluate(bash("git status ; ls ; curl https://x.com"), rules).decision).toBeNull();
   });
 
-  it("does NOT compose across || or backgrounding &", () => {
+  it("composes across || when every sub-command is approved", () => {
+    expect(evaluate(bash("git status || ls"), rules).decision).toBe("allow");
+    expect(evaluate(bash("ls || cat foo"), rules).decision).toBe("allow");
+  });
+
+  it("blocks a || chain when a sub-command is uncovered", () => {
     expect(evaluate(bash("git status || rm -rf /"), rules).decision).toBeNull();
+  });
+
+  it("does NOT compose across a backgrounding &", () => {
+    // `&` detaches a process (changes execution semantics) — never composed,
+    // even when both sides would individually pass.
     expect(evaluate(bash("git status & sleep 5"), rules).decision).toBeNull();
-    // even when both sides would individually pass, || / & are not composed
-    expect(evaluate(bash("git status || ls"), rules).decision).toBeNull();
+    expect(evaluate(bash("ls & git status"), rules).decision).toBeNull();
   });
 
   it("does NOT split a pipe across matchers", () => {

@@ -14,19 +14,16 @@ describe("debugDiagnose — Bash blockers", () => {
     expect(n?.reason ?? "").not.toContain('chains segments with ";"');
   });
 
-  it("flags a never-accepted operator on an uncovered `;` chain", () => {
-    // kubectl isn't covered, and `||` is never accepted → operator is flagged.
-    const n = debugDiagnose(bash("kubectl get pods || kubectl delete pod x"));
-    expect(n?.reason).toContain("||");
+  it("does NOT flag `||` as a hard blocker (it is now composed)", () => {
+    // `||` is composed like && / ; , so it is not a never-accepted operator.
+    const n = debugDiagnose(bash("cat a || cat b"));
+    expect(n?.reason ?? "").not.toContain('chains segments with "||"');
+  });
+
+  it("flags a trailing background & as a never-accepted operator", () => {
+    const n = debugDiagnose(bash("sleep 1 &"));
+    expect(n?.reason).toContain("&");
     expect(n?.hint).toContain("separate");
-  });
-
-  it("flags `||` as never accepted", () => {
-    expect(debugDiagnose(bash("cat a || echo b"))?.reason).toContain("||");
-  });
-
-  it("flags a trailing background &", () => {
-    expect(debugDiagnose(bash("sleep 1 &"))?.reason).toContain("&");
   });
 
   it("flags file redirection", () => {
@@ -92,8 +89,8 @@ describe("debugDiagnose — reason codes", () => {
   it("codes shell substitution", () => {
     expect(debugDiagnose(bash("cat $(whoami)"))?.code).toBe("shell_substitution");
   });
-  it("codes an unsupported operator (||)", () => {
-    expect(debugDiagnose(bash("ls || rm x"))?.code).toBe("unsupported_operator");
+  it("codes an unsupported operator (backgrounding &)", () => {
+    expect(debugDiagnose(bash("sleep 1 &"))?.code).toBe("unsupported_operator");
   });
   it("codes a file redirection", () => {
     expect(debugDiagnose(bash("ls > out.txt"))?.code).toBe("file_redirection");

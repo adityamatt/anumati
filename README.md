@@ -22,15 +22,15 @@ Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked
 anumati tries two strategies, in order:
 
 1. **Whole-command** — a single rule's matcher accepts the entire command, including any `|`, `&&`, or `;` it handles within its own vocabulary (e.g. `cargo`'s `cd … && cargo build | grep`).
-2. **Sequential composition** — if no single rule covers everything, the command is split at top-level `&&`, `;`, and newlines into sub-commands, and it is approved only if **every** sub-command is independently accepted by some rule. For example, `git status && ls -la` is approved when both `git-read` and `safe-inspect` are configured.
+2. **Sequential composition** — if no single rule covers everything, the command is split at top-level `&&`, `;`, `||`, and newlines into sub-commands, and it is approved only if **every** sub-command is independently accepted by some rule. For example, `git status && ls -la` is approved when both `git-read` and `safe-inspect` are configured.
 
 ```mermaid
 flowchart TD
     A[Bash command] --> B{A single rule's matcher<br/>accepts the whole command?}
     B -- yes --> ALLOW([✅ allow])
-    B -- no --> C{Contains a top-level<br/>&#124;&#124; or backgrounding &?}
+    B -- no --> C{Contains a top-level<br/>backgrounding &?}
     C -- yes --> PASS([⤳ passthrough])
-    C -- no --> D[Split at top-level && ; and newlines<br/>pipes stay glued to their segment]
+    C -- no --> D[Split at top-level && ; || and newlines<br/>pipes stay glued to their segment]
     D --> E{More than one<br/>sub-command?}
     E -- no --> PASS
     E -- yes --> F[For each sub-command:<br/>does some rule accept it?]
@@ -44,7 +44,7 @@ Crucially, **a disallowed sub-command still fails its own check**, so you can ne
 Two deliberate limits keep composition safe:
 
 - **Pipes are never split across rules.** A pipe feeds one command's output into the next, so its safety depends on the *receiving* command — only the matcher that owns the pipeline can judge it. `git log | <something>` is handed to a matcher as one unit; it is never satisfied by two different rules. (Coupled cases like `curl … | python3 -c …` are hand-vetted inside a single matcher.)
-- **`||` and backgrounding `&` are not composed** — only the purely sequential `&&` / `;`, where no data flows between segments.
+- **Backgrounding `&` is not composed** — only the sequential operators `&&`, `;`, and `||`, where no data flows between segments. A `&` detaches a process (changing execution semantics), so it is excluded.
 
 Matchers do understand compound commands within their own safe vocabulary. The `curl` matcher, for instance, allows piping into read-only builtins (`curl https://api.github.com/repos | jq .`), and `cargo`/`go` allow a leading `cd <dir> &&`. But that awareness is scoped to the one matcher — it is never a license to mix segments belonging to different rules.
 
@@ -184,7 +184,7 @@ Every **passthrough** entry (in `passthrough_file`, or `audit_file` at level `al
 |---|---|
 | `shell_substitution` | Contains `$(...)` or backticks — never parsed, for safety |
 | `unparseable` | Could not be parsed (e.g. an unclosed quote) |
-| `unsupported_operator` | Uses `\|\|` or a backgrounding `&` — never composed |
+| `unsupported_operator` | Uses a backgrounding `&` — never composed |
 | `file_redirection` | A segment writes/reads a file (`> out`, `< in`); stream redirects like `2>/dev/null` are fine |
 | `dangerous_command` | Leading command is an interpreter/shell/privileged tool, never auto-approved |
 | `no_matcher` | A (sub-)command that no configured rule covers — add or extend a matcher |
