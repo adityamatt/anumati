@@ -22,7 +22,7 @@ Configs cascade: a project config at `<cwd>/.claude/permissions.json` is checked
 anumati tries two strategies, in order:
 
 1. **Whole-command** — a single rule's matcher accepts the entire command, including any `|`, `&&`, or `;` it handles within its own vocabulary (e.g. `cargo`'s `cd … && cargo build | grep`).
-2. **Sequential composition** — if no single rule covers everything, the command is split at top-level `&&` and `;` into sub-commands, and it is approved only if **every** sub-command is independently accepted by some rule. For example, `git status && ls -la` is approved when both `git-read` and `safe-inspect` are configured.
+2. **Sequential composition** — if no single rule covers everything, the command is split at top-level `&&`, `;`, and newlines into sub-commands, and it is approved only if **every** sub-command is independently accepted by some rule. For example, `git status && ls -la` is approved when both `git-read` and `safe-inspect` are configured.
 
 ```mermaid
 flowchart TD
@@ -30,7 +30,7 @@ flowchart TD
     B -- yes --> ALLOW([✅ allow])
     B -- no --> C{Contains a top-level<br/>&#124;&#124; or backgrounding &?}
     C -- yes --> PASS([⤳ passthrough])
-    C -- no --> D[Split at top-level && and ;<br/>pipes stay glued to their segment]
+    C -- no --> D[Split at top-level && ; and newlines<br/>pipes stay glued to their segment]
     D --> E{More than one<br/>sub-command?}
     E -- no --> PASS
     E -- yes --> F[For each sub-command:<br/>does some rule accept it?]
@@ -147,16 +147,17 @@ Each entry in `allow` is a rule. `tool` scopes the rule to a tool; `matcher` sel
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins | `allowed_imports`, `open.allowed_paths` |
 | `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules, no `fs`/network/`child_process`/`eval`; a file-path `require()` is allowed only under `open.allowed_paths` | `allowed_modules`, `open.allowed_paths` |
 | `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create) | `allowed_packages` |
-| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries | `allowed_scripts` |
+| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` + read-only queries (+ trailing `&& echo`, pipe to builtins) | `allowed_scripts` |
 | `cargo` | Bash | allow `cargo check/build/test/clippy/fmt --check/tree/…` | — |
 | `go` | Bash | allow `go build/test/vet/fmt/list/doc/env(read)/mod(read)` | — |
 | `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/…) | — |
-| `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant) | — |
+| `npx-tsc` | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant, pipe to builtins) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked | — |
 | `aws` | Bash | allow read-only AWS CLI for supported services (`logs`, `stepfunctions`, `s3`/`s3api`) — list/describe/get/filter only; writes and local-write commands (`s3 cp`/`sync`/`rm`, `s3api get-object`) blocked (+ `cd … &&` variant, pipe to builtins) | — |
 | `sleep` | Bash | allow a bare `sleep <seconds>` (single integer); no operators/redirection | — |
+| `echo` | Bash | allow a bare `echo …` (stdout only; file redirect blocked); common as `&& echo "=== … ==="` markers | — |
 
 ### Audit levels
 

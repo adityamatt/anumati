@@ -14,6 +14,30 @@ describe("parseCompound — simple commands", () => {
   });
 });
 
+describe("parseCompound — newlines as separators", () => {
+  it("treats a newline like a ; separator", () => {
+    const s = parseCompound("cd /a/b\nnpx tsc --noEmit");
+    expect(s).toHaveLength(2);
+    expect(s![0].raw).toBe("cd /a/b");
+    expect(s![0].operator).toBe(";");
+    expect(s![1].raw).toBe("npx tsc --noEmit");
+    expect(s![1].operator).toBeNull();
+  });
+
+  it("does not add a phantom segment for a trailing && before a newline", () => {
+    const s = parseCompound("cmd1 &&\n  cmd2");
+    expect(s).toHaveLength(2);
+    expect(s![0].raw).toBe("cmd1");
+    expect(s![0].operator).toBe("&&");
+    expect(s![1].raw).toBe("cmd2");
+  });
+
+  it("splits multiple lines", () => {
+    const s = parseCompound("ls\nwc -l x\ngit status");
+    expect(s).toHaveLength(3);
+  });
+});
+
 describe("parseCompound — operators", () => {
   it("splits on pipe", () => {
     const s = parseCompound("curl -s https://example.com | head -5");

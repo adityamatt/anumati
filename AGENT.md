@@ -10,12 +10,13 @@ stdin (JSON from Claude Code)
         ├── src/config.ts   defaultConfigPath / projectConfigPath / loadConfig
         ├── src/matcher.ts  evaluate() — (1) whole-command: first rule whose matcher accepts the
         │                   full command wins; (2) sequential composition: else split on top-level
-        │                   && / ; and approve iff every sub-command is accepted by some rule.
+        │                   && / ; (and newlines, treated as ;) and approve iff every sub-command
+        │                   is accepted by some rule.
         │                   Pipes are kept inside a sub-command (never composed across rules);
         │                   || and backgrounding & are not composed.
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws / sleep
+        │           └── cargo / go / git-read / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -115,11 +116,11 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `python3-pipe` | Bash | allow `python3 -c`/script with allowlisted imports, no dangerous builtins/dynamic open() | `allowed_imports`, `open.allowed_paths` |
 | `nodejs-pipe` | Bash | allow `node -e`/`-p`/script with allowlisted built-in modules; fs/network/child_process/vm/os always blocked, no eval/Function/dynamic require; file-path require()/import allowed only under open.allowed_paths (path-checked, no `..`) | `allowed_modules`, `open.allowed_paths` |
 | `pip3-install` | Bash | allow `pip/pip3 install` of allowlisted packages (+ venv create, `&& echo`) | `allowed_packages` |
-| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` for allowlisted scripts + read-only queries (ls/view/outdated) | `allowed_scripts` |
+| `npm-script` | Bash | allow `npm/pnpm/yarn run <script>` for allowlisted scripts + read-only queries (ls/view/outdated); trailing `&& echo`, safe stream redirects, and pipe-to-consumer allowed | `allowed_scripts` |
 | `cargo` | Bash | allow cargo check/build/test/clippy/fmt --check/tree/… (+ cd && variant, pipe to builtins) | — |
 | `go` | Bash | allow go build/test/vet/fmt/list/doc/env(read)/mod(read) (+ cd && variant, pipe to builtins) | — |
 | `git-read` | Bash | allow read-only git subcommands (status/log/diff/show/branch-list/config --get/…), pipe to safe builtins | — |
-| `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant) | — |
+| `npx-tsc` | Bash | allow npx tsc --noEmit (+ cd && variant, pipe to consumers) | — |
 | `safe-inspect` | Bash | allow read-only inspection builtins, standalone or piped (ls/cat/head/tail/grep/rg/find/stat/wc/…) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |

@@ -37,6 +37,10 @@ export function parseCompound(command: string): Segment[] | null {
       else if (ch === "&" && next === "&") { push(i, "&&", 2); i++; }
       else if (ch === "|") { push(i, "|", 1); }
       else if (ch === ";") { push(i, ";", 1); }
+      // A newline (outside quotes) terminates a command, exactly like `;`.
+      // A trailing `&&`/`||`/`|` before the newline was already consumed above,
+      // so the empty span here is trimmed away and only the operator survives.
+      else if (ch === "\n" || ch === "\r") { push(i, ";", 1); }
       // A bare `&` is a background operator EXCEPT when it is part of a redirect:
       // `>&` (fd duplication, e.g. `2>&1`, `>&2`) or `&>` (bash's merge redirect,
       // e.g. `&>/dev/null`). Those must stay inside the segment so redirect
