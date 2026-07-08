@@ -16,17 +16,36 @@ import {
 } from "./settings.js";
 import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
 
-// Safe, parameter-free starter rules. All low-risk and broadly useful, so a
-// fresh user gets immediate value without having to hand-write any allowlists.
-// Parameterized matchers needing user-specific values (curl/pip3-install/
-// npm-script/gh) are omitted — add those later via `anumati add`. The
-// python3-pipe rule is seeded with a curated pure-stdlib import set: those
-// modules have no file/network/exec capability, and any open() in user code is
-// still path-checked separately, so this does not widen filesystem access.
+// Starter rules a fresh user gets for immediate value without hand-writing any
+// allowlists. Two tiers, both broadly useful for day-to-day development:
+//   - read-only / no-op / lint: safe-inspect, git-read, cd, sleep, echo, sed,
+//     jq, npx-tsc, cargo, go — no side effects (or idempotent formatting).
+//   - build/test runners: vitest, test-runner, npm-script — these EXECUTE the
+//     project's own code, the same trust already implied by working in the repo.
+// Deliberately omitted (opt in via `anumati add`): parameterized matchers that
+// are useless empty (curl needs domains, gh needs repos, pip3-install needs
+// packages) and git-write (mutates the repo — enable explicit ops when wanted).
+// The python3-pipe / nodejs-pipe rules are seeded with curated side-effect-free
+// module sets; any open()/file-path require() is still path-checked separately.
 export const STARTER_RULES: Rule[] = [
   { tool: "Bash", matcher: "safe-inspect", desc: "Read-only inspection (ls/cat/grep/find/…)" },
   { tool: "Bash", matcher: "git-read", desc: "Read-only git (status/log/diff/…)" },
+  { tool: "Bash", matcher: "cd", desc: "cd into the working directory or a subfolder" },
+  { tool: "Bash", matcher: "sleep", desc: "Pause execution (sleep <seconds>)" },
+  { tool: "Bash", matcher: "echo", desc: "Print to stdout (progress/section markers)" },
+  { tool: "Bash", matcher: "sed", desc: "Read-only sed (print/delete/quit; -i/write blocked)" },
+  { tool: "Bash", matcher: "jq", desc: "JSON processing (jq <filter> [file])" },
   { tool: "Bash", matcher: "npx-tsc", desc: "TypeScript type checking (npx tsc --noEmit)" },
+  { tool: "Bash", matcher: "cargo", desc: "cargo check/build/test/clippy/… (read-only/build)" },
+  { tool: "Bash", matcher: "go", desc: "go build/test/vet/fmt/list/… (read-only/build)" },
+  { tool: "Bash", matcher: "vitest", desc: "Run tests (npx vitest run …; watch mode blocked)" },
+  { tool: "Bash", matcher: "test-runner", desc: "Test runners (pytest/jest); watch mode blocked" },
+  {
+    tool: "Bash",
+    matcher: "npm-script",
+    allowed_scripts: ["*"],
+    desc: "npm/pnpm/yarn run <script> (any script) + read-only queries",
+  },
   {
     tool: "Bash",
     matcher: "python3-pipe",

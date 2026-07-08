@@ -24,11 +24,11 @@ anumati tries two strategies, in order:
 
 ```mermaid
 flowchart TD
-    A[Bash command] --> B{A single rule's matcher<br/>accepts the whole command?}
+    A[Bash command] --> B{"A single rule's matcher<br/>accepts the whole command?"}
     B -- yes --> ALLOW([✅ allow])
-    B -- no --> D[Split at top-level && ; || & and newlines<br/>pipes stay glued to their segment]
-    D --> F[For each sub-command:<br/>does some rule accept it?]
-    F --> G{Every sub-command<br/>approved?}
+    B -- no --> D["Split at top-level && ; || & and newlines<br/>pipes stay glued to their segment"]
+    D --> F["For each sub-command:<br/>does some rule accept it?"]
+    F --> G{"Every sub-command<br/>approved?"}
     G -- yes --> ALLOW
     G -- no --> PASS([⤳ passthrough])
 ```
@@ -61,7 +61,13 @@ anumati init
 
 `anumati init` prompts whether to set up a **project** config (this folder) or a **root** config (global, applies everywhere), shows which already exist, and then:
 
-1. **Writes a starter config** of low-risk rules so anumati is useful immediately: `safe-inspect`, `git-read`, `npx-tsc`, a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …), and a `nodejs-pipe` rule pre-allowing the equivalent set of **pure-compute** Node built-ins (`path`, `crypto`, `url`, `util`, `buffer`, `zlib`, …). Those modules have no file, network, or code-execution entry points. For python3 any `open()` in your script is still path-checked; for node the filesystem module `fs` (along with `child_process`/`net`/`http`/`os`/`vm`) is blocked outright, and a file-path `require()` (e.g. `require("./data.json")`) is allowed only if the path sits under `open.allowed_paths` — so blessing these doesn't widen file or network access. (Libraries with I/O side channels like `numpy`/`pandas`, and any npm package, are deliberately **not** included; add them explicitly with `anumati add` if you accept the risk.)
+1. **Writes a starter config** of broadly-useful, low-risk rules so anumati is useful immediately, in two tiers:
+   - **Read-only / no-op / lint** — `safe-inspect`, `git-read`, `cd`, `sleep`, `echo`, `sed`, `jq`, `npx-tsc`, `cargo`, `go`. No side effects (or idempotent formatting).
+   - **Build / test runners** — `vitest`, `test-runner` (pytest/jest), `npm-script` (`allowed_scripts: ["*"]`). These **execute the project's own code** — the same trust implied by working in the repo. Remove them from the config if you'd rather approve test/build runs manually.
+   - Plus a `python3-pipe` rule pre-allowing a curated set of **pure-stdlib** Python modules (`json`, `math`, `statistics`, `datetime`, `re`, `hashlib`, …), and a `nodejs-pipe` rule pre-allowing the equivalent **pure-compute** Node built-ins (`path`, `crypto`, `url`, `util`, `buffer`, `zlib`, …). Those modules have no file, network, or code-execution entry points. For python3 any `open()` is still path-checked; for node the filesystem module `fs` (along with `child_process`/`net`/`http`/`os`/`vm`) is blocked outright, and a file-path `require()` is allowed only under `open.allowed_paths` — so blessing these doesn't widen file or network access. (Libraries with I/O side channels like `numpy`/`pandas`, and any npm package, are deliberately **not** included.)
+
+   Deliberately **not** seeded (opt in with `anumati add`): parameterized matchers that are useless empty (`curl` needs domains, `gh` needs repos, `pip3-install` needs packages) and `git-write` (mutates the repo — enable specific ops when you want them).
+
 2. **Scaffolds an audit log** (`anumati-audit.jsonl`) next to the config.
 3. **Registers the PreToolUse hook** in the `settings.json` beside the config, so Claude Code actually calls anumati — merging into any existing settings without clobbering them. **Restart Claude Code (or run `/hooks`)** for it to take effect.
 4. **Adds a SessionStart banner** — a `⚡ anumati active — N rules` message shown at the start of each session so you can see at a glance that anumati is wired up.
@@ -377,16 +383,6 @@ anumati debug on --config ./path/permissions.json
 ```
 
 `anumati debug` only flips `suggest.debug`, merging into the existing config (rules, audit, and other suggest fields are preserved). It needs a config to already exist — run `anumati init` (or `anumati init --debug` to start with it on) first. Because the hook re-reads the config on every call, a toggle takes effect immediately — no restart needed.
-
-## Development
-
-```bash
-git clone https://github.com/your-username/anumati
-cd anumati
-npm install
-npm run build
-npm test
-```
 
 ## License
 
