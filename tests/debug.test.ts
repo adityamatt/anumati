@@ -14,16 +14,12 @@ describe("debugDiagnose — Bash blockers", () => {
     expect(n?.reason ?? "").not.toContain('chains segments with ";"');
   });
 
-  it("does NOT flag `||` as a hard blocker (it is now composed)", () => {
-    // `||` is composed like && / ; , so it is not a never-accepted operator.
-    const n = debugDiagnose(bash("cat a || cat b"));
-    expect(n?.reason ?? "").not.toContain('chains segments with "||"');
-  });
-
-  it("flags a trailing background & as a never-accepted operator", () => {
-    const n = debugDiagnose(bash("sleep 1 &"));
-    expect(n?.reason).toContain("&");
-    expect(n?.hint).toContain("separate");
+  it("does NOT flag composable operators (&& / ; / || / &) as hard blockers", () => {
+    // All sequential operators compose now; none is a never-accepted blocker.
+    for (const cmd of ["cat a || cat b", "cat a & cat b", "cat a; cat b"]) {
+      const n = debugDiagnose(bash(cmd));
+      expect(n?.code).not.toBe("unsupported_operator");
+    }
   });
 
   it("flags file redirection", () => {
@@ -89,8 +85,9 @@ describe("debugDiagnose — reason codes", () => {
   it("codes shell substitution", () => {
     expect(debugDiagnose(bash("cat $(whoami)"))?.code).toBe("shell_substitution");
   });
-  it("codes an unsupported operator (backgrounding &)", () => {
-    expect(debugDiagnose(bash("sleep 1 &"))?.code).toBe("unsupported_operator");
+  it("codes a bare backgrounded command by its inner command (no rules)", () => {
+    // `&` composes: `sleep 1 &` diagnoses the stripped `sleep 1` as no_matcher.
+    expect(debugDiagnose(bash("sleep 1 &"), [])?.code).toBe("no_matcher");
   });
   it("codes a file redirection", () => {
     expect(debugDiagnose(bash("ls > out.txt"))?.code).toBe("file_redirection");

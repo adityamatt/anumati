@@ -105,19 +105,18 @@ describe("hook — suggestion on passthrough", () => {
 });
 
 describe("hook — debug mode", () => {
-  it("explains WHY a backgrounded command fell through (via systemMessage)", () => {
+  it("explains WHY an uncovered command fell through (via systemMessage)", () => {
     writeFileSync(configPath, JSON.stringify({ suggest: { debug: true }, allow: [] }));
     const res = run([configPath], {
       session_id: "s",
       tool_name: "Bash",
-      // backgrounding `&` is never composed → the debug note is about the operator.
-      tool_input: { command: "sleep 5 &" },
+      tool_input: { command: "kubectl get pods" },
       cwd: dir,
     });
     expect(isPassthroughMessage(res.stdout)).toBe(true); // still passthrough
     const msg = systemMessage(res.stdout);
     expect(msg).toContain("🔍 anumati [debug]");
-    expect(msg).toContain("&");
+    expect(msg).toContain("kubectl");
   });
 
   it("is silent when debug is off (default)", () => {

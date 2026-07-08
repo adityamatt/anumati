@@ -22,16 +22,16 @@ function firstMatchingRule(input: HookInput, allowRules: Rule[]): Rule | null {
   return null;
 }
 
-// Sequential (control-flow only) separators: no data flows between the pieces,
-// so composing them is safe when every sub-command is independently approved.
-// `&&` (on success), `;` (unconditional), and `||` (on failure) all qualify.
-// A backgrounding `&` is deliberately excluded — it detaches a process and
-// changes execution semantics, a different risk class.
-const SEQUENTIAL_OPS = new Set(["&&", ";", "||"]);
+// Control-flow separators that carry no data between the pieces, so composing
+// them is safe when every sub-command is independently approved: `&&` (on
+// success), `;` (unconditional), `||` (on failure), and `&` (background). `&`
+// runs its segment concurrently rather than sequentially, but since every
+// sub-command must be independently approved, running approved commands in
+// parallel grants no capability that running them in sequence wouldn't.
+const SEQUENTIAL_OPS = new Set(["&&", ";", "||", "&"]);
 
 /**
- * Split a command into sub-commands at top-level `&&`, `;`, and `||` — the
- * purely *sequential* operators, where no data flows between the pieces. Pipes
+ * Split a command into sub-commands at top-level `&&`, `;`, `||`, and `&`. Pipes
  * are kept INSIDE each sub-command (rejoined with ` | `), so a piped chain is
  * always handed to a single matcher as one unit and never composed across rules
  * — the pipe is a data-flow channel whose safety only the receiving matcher can
@@ -39,16 +39,11 @@ const SEQUENTIAL_OPS = new Set(["&&", ";", "||"]);
  *
  * Returns null (do not decompose) when the command:
  *   - does not parse,
- *   - contains a backgrounding `&` (changes execution semantics — not composed),
  *   - or yields fewer than 2 sub-commands (nothing to compose).
  */
 export function decomposeSequential(command: string): string[] | null {
   const segments = parseCompound(command);
   if (!segments) return null;
-
-  for (const s of segments) {
-    if (s.operator === "&") return null;
-  }
 
   const subs: string[] = [];
   let group: string[] = [];
@@ -63,7 +58,13 @@ export function decomposeSequential(command: string): string[] | null {
   }
   if (group.length > 0) subs.push(group.join(" | "));
 
-  return subs.length >= 2 ? subs : null;
+  // Compose when there is real work to split: 2+ sub-commands, OR a single
+  // sub-command that differs from the raw input — the latter happens for a bare
+  // trailing operator (e.g. `sleep 5 &`), where stripping the `&` yields a plain
+  // command the whole-command path could not match with the operator attached.
+  if (subs.length >= 2) return subs;
+  if (subs.length === 1 && subs[0] !== command.trim()) return subs;
+  return null;
 }
 
 /**
@@ -74,7 +75,7 @@ export function decomposeSequential(command: string): string[] | null {
  *      accept its own `cd … &&`, pipes into safe consumers, etc.).
  *
  *   2. Sequential composition — if no single rule covers the whole command,
- *      split it on `&&`/`;`/`||` and approve only if EVERY sub-command is
+ *      split it on `&&`/`;`/`||`/`&` and approve only if EVERY sub-command is
  *      independently accepted by some rule. Because a disallowed segment fails
  *      its own check, you still can't smuggle a bad command in by chaining it
  *      onto a good one. Pipes are never split across matchers (see
@@ -104,6 +105,6 @@ export function evaluate(input: HookInput, allowRules: Rule[]): MatchResult {
 
   return {
     decision: "allow",
-    rule: { desc: `composite: ${subs.length} sub-commands joined by && / ;` },
+    rule: { desc: `composite: ${subs.length} sub-command(s) joined by && / ; / || / &` },
   };
 }

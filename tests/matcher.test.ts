@@ -388,11 +388,19 @@ describe("evaluate — sequential composition (&& / ; / ||)", () => {
     expect(evaluate(bash("git status || rm -rf /"), rules).decision).toBeNull();
   });
 
-  it("does NOT compose across a backgrounding &", () => {
-    // `&` detaches a process (changes execution semantics) — never composed,
-    // even when both sides would individually pass.
-    expect(evaluate(bash("git status & sleep 5"), rules).decision).toBeNull();
-    expect(evaluate(bash("ls & git status"), rules).decision).toBeNull();
+  it("composes across a backgrounding & when every sub-command is approved", () => {
+    // Running approved commands in parallel grants no capability that running
+    // them in sequence wouldn't, so `&` composes like the other separators.
+    expect(evaluate(bash("ls & git status"), rules).decision).toBe("allow");
+  });
+
+  it("allows a bare trailing & on an approved command", () => {
+    expect(evaluate(bash("git status &"), rules).decision).toBe("allow");
+  });
+
+  it("blocks a & chain when a sub-command is uncovered", () => {
+    expect(evaluate(bash("git status & rm -rf /"), rules).decision).toBeNull();
+    expect(evaluate(bash("rm -rf / &"), rules).decision).toBeNull();
   });
 
   it("does NOT split a pipe across matchers", () => {
