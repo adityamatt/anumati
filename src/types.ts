@@ -18,6 +18,14 @@ export interface Rule {
   allowed_repos?: string[];
   allowed_packages?: string[];
   allowed_scripts?: string[];
+  /**
+   * Git write subcommands the `git-write` matcher may allow, e.g.
+   * ["add","commit","branch","checkout"]. Only non-destructive, local ops can
+   * be enabled — network ops (push/pull/fetch) and destructive/history-rewriting
+   * forms (push --force, reset --hard, branch -D, clean -f, rebase, …) are
+   * hard-blocked regardless of this list.
+   */
+  allowed_git_ops?: string[];
   open?: OpenConfig;
   subagent_type?: string;
   desc?: string;
