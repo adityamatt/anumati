@@ -78,12 +78,53 @@ describe("debugDiagnose — other tools", () => {
 
 describe("formatDebugNote", () => {
   it("renders reason with the 🔍 prefix", () => {
-    expect(formatDebugNote({ reason: "because" })).toBe("🔍 anumati [debug]: because\n");
+    expect(formatDebugNote({ code: "unknown", reason: "because" })).toBe("🔍 anumati [debug]: because\n");
   });
 
   it("appends the hint on its own line when present", () => {
-    const out = formatDebugNote({ reason: "r", hint: "do x" });
+    const out = formatDebugNote({ code: "no_matcher", reason: "r", hint: "do x" });
     expect(out).toContain("🔍 anumati [debug]: r");
     expect(out).toContain("\n   → do x\n");
+  });
+});
+
+describe("debugDiagnose — reason codes", () => {
+  it("codes shell substitution", () => {
+    expect(debugDiagnose(bash("cat $(whoami)"))?.code).toBe("shell_substitution");
+  });
+  it("codes an unsupported operator (||)", () => {
+    expect(debugDiagnose(bash("ls || rm x"))?.code).toBe("unsupported_operator");
+  });
+  it("codes a file redirection", () => {
+    expect(debugDiagnose(bash("ls > out.txt"))?.code).toBe("file_redirection");
+  });
+  it("codes a dangerous leading command", () => {
+    expect(debugDiagnose(bash("bash -c whatever"))?.code).toBe("dangerous_command");
+  });
+  it("codes an uncovered command", () => {
+    expect(debugDiagnose(bash("kubectl get pods"))?.code).toBe("no_matcher");
+  });
+});
+
+describe("debugDiagnose — composition-aware offending sub-command", () => {
+  const rules = [
+    { tool: "Bash", matcher: "git-read" },
+    { tool: "Bash", matcher: "safe-inspect" },
+  ];
+
+  it("pinpoints the failing sub-command in a && chain", () => {
+    const note = debugDiagnose(bash("git status && npm publish"), rules);
+    expect(note?.offending).toBe("npm publish");
+    expect(note?.code).toBe("no_matcher");
+    expect(note?.reason).toContain("npm");
+  });
+
+  it("does not blame the first segment when it is fine", () => {
+    const note = debugDiagnose(bash("ls && rm -rf /"), rules);
+    expect(note?.offending).toBe("rm -rf /");
+  });
+
+  it("has no offending field for a single command", () => {
+    expect(debugDiagnose(bash("kubectl get pods"), rules)?.offending).toBeUndefined();
   });
 });

@@ -1,5 +1,6 @@
 import { appendFileSync } from "fs";
 import type { HookInput, MatchResult, AuditConfig } from "./types.js";
+import type { DebugNote } from "./debug.js";
 
 // Formats a Date as an ISO 8601 string in the machine's local timezone,
 // preserving the UTC offset (e.g. "2026-07-02T14:30:00.000-07:00") instead
@@ -18,8 +19,13 @@ function localISOString(date: Date): string {
   );
 }
 
-function writeEntry(file: string, input: HookInput, result: MatchResult): void {
-  const entry = {
+function writeEntry(
+  file: string,
+  input: HookInput,
+  result: MatchResult,
+  note?: DebugNote | null,
+): void {
+  const entry: Record<string, unknown> = {
     ts: localISOString(new Date()),
     tool: input.tool_name,
     command: input.tool_input.command,
@@ -27,6 +33,14 @@ function writeEntry(file: string, input: HookInput, result: MatchResult): void {
     decision: result.decision ?? "passthrough",
     rule_desc: result.rule?.desc,
   };
+
+  // On passthrough, record WHY it was not auto-approved so the log is
+  // self-explanatory (no need to re-analyze the command later).
+  if (result.decision === null && note) {
+    entry.reason_code = note.code;
+    entry.reason = note.reason;
+    if (note.offending) entry.offending = note.offending;
+  }
 
   try {
     appendFileSync(file, JSON.stringify(entry) + "\n");
@@ -38,7 +52,8 @@ function writeEntry(file: string, input: HookInput, result: MatchResult): void {
 export function audit(
   config: AuditConfig | undefined,
   input: HookInput,
-  result: MatchResult
+  result: MatchResult,
+  note?: DebugNote | null,
 ): void {
   const level = config?.audit_level ?? "matched";
   if (level === "off") return;
@@ -51,7 +66,7 @@ export function audit(
     // otherwise fall back to audit_file only when level is "all" (legacy behavior
     // where approvals and passthroughs share one file).
     const target = passthroughFile ?? (level === "all" ? auditFile : undefined);
-    if (target) writeEntry(target, input, result);
+    if (target) writeEntry(target, input, result, note);
     return;
   }
 

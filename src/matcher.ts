@@ -34,7 +34,7 @@ function firstMatchingRule(input: HookInput, allowRules: Rule[]): Rule | null {
  *   - contains `||` or a backgrounding `&` (riskier operators we don't compose),
  *   - or yields fewer than 2 sub-commands (nothing to compose).
  */
-function decomposeSequential(command: string): string[] | null {
+export function decomposeSequential(command: string): string[] | null {
   const segments = parseCompound(command);
   if (!segments) return null;
 
