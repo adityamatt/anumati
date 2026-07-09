@@ -93,12 +93,61 @@ describe("matchAws — block writes / mutations", () => {
   });
 });
 
+describe("matchAws — dynamodb (allow read-only)", () => {
+  it("get-item", () => expect(matchAws("aws dynamodb get-item --table-name x --key '{}'")).toBe(true));
+  it("query", () => expect(matchAws('aws dynamodb query --table-name x --key-condition-expression "pk = :p"')).toBe(true));
+  it("scan with filter/projection flags", () => {
+    expect(
+      matchAws(
+        `aws dynamodb scan --profile drashta-prod --region eu-central-1 --table-name "DrashtaProdAppStack-config" --filter-expression "begins_with(sk, :f)" --expression-attribute-values '{":f":{"S":"file#"}}' --output json`,
+      ),
+    ).toBe(true);
+  });
+  it("batch-get-item", () => expect(matchAws("aws dynamodb batch-get-item --request-items '{}'")).toBe(true));
+  it("describe-table", () => expect(matchAws("aws dynamodb describe-table --table-name x")).toBe(true));
+  it("list-tables", () => expect(matchAws("aws dynamodb list-tables")).toBe(true));
+});
+
+describe("matchAws — dynamodb (block writes)", () => {
+  it("put-item", () => expect(matchAws("aws dynamodb put-item --table-name x --item '{}'")).toBe(false));
+  it("update-item", () => expect(matchAws("aws dynamodb update-item --table-name x --key '{}'")).toBe(false));
+  it("delete-item", () => expect(matchAws("aws dynamodb delete-item --table-name x --key '{}'")).toBe(false));
+  it("batch-write-item", () => expect(matchAws("aws dynamodb batch-write-item --request-items '{}'")).toBe(false));
+  it("delete-table", () => expect(matchAws("aws dynamodb delete-table --table-name x")).toBe(false));
+  it("execute-statement (PartiQL, can mutate)", () => {
+    expect(matchAws(`aws dynamodb execute-statement --statement "SELECT * FROM x"`)).toBe(false);
+  });
+});
+
+describe("matchAws — lambda (allow read-only)", () => {
+  it("get-function-configuration with query flags", () => {
+    expect(
+      matchAws(
+        `aws lambda get-function-configuration --profile drashta-prod --region eu-central-1 --function-name "DrashtaProdAppStack-QueryRunnerRunFileHandler60586-THdlLFGiJ3R3" --query "{VpcConfig:VpcConfig,Timeout:Timeout}" --output json`,
+      ),
+    ).toBe(true);
+  });
+  it("get-function", () => expect(matchAws("aws lambda get-function --function-name x")).toBe(true));
+  it("get-policy", () => expect(matchAws("aws lambda get-policy --function-name x")).toBe(true));
+  it("list-functions", () => expect(matchAws("aws lambda list-functions")).toBe(true));
+  it("list-event-source-mappings", () => expect(matchAws("aws lambda list-event-source-mappings --function-name x")).toBe(true));
+});
+
+describe("matchAws — lambda (block writes & invokes)", () => {
+  it("invoke (executes & writes local response file)", () => {
+    expect(matchAws("aws lambda invoke --function-name x out.json")).toBe(false);
+  });
+  it("invoke-async", () => expect(matchAws("aws lambda invoke-async --function-name x --invoke-args '{}'")).toBe(false));
+  it("update-function-code", () => expect(matchAws("aws lambda update-function-code --function-name x")).toBe(false));
+  it("update-function-configuration", () => expect(matchAws("aws lambda update-function-configuration --function-name x")).toBe(false));
+  it("delete-function", () => expect(matchAws("aws lambda delete-function --function-name x")).toBe(false));
+  it("create-function", () => expect(matchAws("aws lambda create-function --function-name x")).toBe(false));
+  it("publish-version", () => expect(matchAws("aws lambda publish-version --function-name x")).toBe(false));
+});
+
 describe("matchAws — block out-of-scope services", () => {
   it("ec2 describe-instances is rejected (service not allowlisted)", () => {
     expect(matchAws("aws ec2 describe-instances")).toBe(false);
-  });
-  it("dynamodb get-item is rejected (service not allowlisted)", () => {
-    expect(matchAws("aws dynamodb get-item --table-name x")).toBe(false);
   });
   it("iam list-users is rejected (service not allowlisted)", () => {
     expect(matchAws("aws iam list-users")).toBe(false);
