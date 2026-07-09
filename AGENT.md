@@ -16,7 +16,7 @@ stdin (JSON from Claude Code)
         │                   sub-command (never composed across rules — the pipe is a data channel).
         │     └── rule.matcher → src/matchers/index.ts → matchNamed()
         │           ├── curl / gh / python3-pipe / nodejs-pipe / pip3-install / npm-script  (parameterized)
-        │           └── cargo / go / git-read / git-write / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo / sed / jq / test-runner
+        │           └── cargo / go / git-read / git-write / npx-tsc / safe-inspect / cd / vitest / aws / sleep / echo / sed / jq / test-runner / build-tool
         │           (most use parseCompound + tokenize from src/parser/shell.ts,
         │            classify from src/classifiers/index.ts, python3 safety from classifiers/python3.ts,
         │            nodejs safety from classifiers/nodejs.ts)
@@ -127,6 +127,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `sed` | Bash | allow read-only sed: strict script grammar of `[N[,M]]` addresses + p/d/q/= commands only; reject `-i`/`--in-place`/`-f`/`w`/`W`/`e`/`s///`; unknown flags rejected (+ pipe to consumers) | — |
 | `jq` | Bash | allow `jq <filter> [file]` — pure JSON transform, no fs/network/exec; reject `-f`/`--from-file` and bare `jq` (no filter); (+ pipe to consumers) | — |
 | `test-runner` | Bash | allow pytest / `python[3] -m pytest` / `[npx] jest` (test code executes — same trust as vitest/cargo test); reject `--watch`/`-w`/`--watchAll` (hangs) and jest `-u`/`--updateSnapshot` (writes); (+ cd && variant, pipe to consumers) | — |
+| `build-tool` | Bash | allow one-shot frontend builds: `vite`/`next` require the `build` subcommand, `webpack`/`rollup`/`esbuild` build by default; reject dev/serve/preview/start/watch subcommands + `--watch`/`-w`/`--serve` (long-running, would hang); (+ cd && variant, pipe to consumers) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
 | `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`) to a per-service read-only subcommand allowlist (list/describe/get/filter; s3 = `ls` only, s3api = metadata reads, no get-object); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |

@@ -98,6 +98,7 @@ selects a named matcher; the `allowed_*` fields parameterize it.
 | `sed`          | Bash | allow read-only `sed` — print/delete/quit scripts (e.g. `sed -n '1,60p' file`); `-i`/`-f`/`w`/`e`/substitution blocked (+ pipe to builtins)                                                                                                       | —                                       |
 | `jq`           | Bash | allow `jq <filter> [file]` (pure JSON transform; `-f` filter-file blocked; + pipe to builtins)                                                                                                                                                    | —                                       |
 | `test-runner`  | Bash | allow `pytest` / `python -m pytest` / `[npx] jest` (+ `cd … &&`, pipe to builtins); `--watch`/`-u` blocked                                                                                                                                        | —                                       |
+| `build-tool`   | Bash | allow one-shot frontend builds — `[npx] vite build`, `next build`, `webpack`, `rollup`, `esbuild` (+ `cd … &&`, pipe to builtins); dev/serve/preview/`--watch` (long-running) blocked                                                             | —                                       |
 
 ## Command composition
 

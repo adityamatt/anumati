@@ -40,6 +40,7 @@ export const STARTER_RULES: Rule[] = [
   { tool: "Bash", matcher: "go", desc: "go build/test/vet/fmt/list/… (read-only/build)" },
   { tool: "Bash", matcher: "vitest", desc: "Run tests (npx vitest run …; watch mode blocked)" },
   { tool: "Bash", matcher: "test-runner", desc: "Test runners (pytest/jest); watch mode blocked" },
+  { tool: "Bash", matcher: "build-tool", desc: "Frontend builds (vite/next/webpack/… build); dev/serve blocked" },
   {
     tool: "Bash",
     matcher: "npm-script",
