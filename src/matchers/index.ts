@@ -19,6 +19,7 @@ import { matchEcho } from "./echo.js";
 import { matchSed } from "./sed.js";
 import { matchJq } from "./jq.js";
 import { matchTestRunner } from "./test-runner.js";
+import { matchBuildTool } from "./build-tool.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -44,6 +45,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "sed":          return matchSed(cmd);
     case "jq":           return matchJq(cmd);
     case "test-runner":  return matchTestRunner(cmd);
+    case "build-tool":   return matchBuildTool(cmd);
     default:             return false;
   }
 }
