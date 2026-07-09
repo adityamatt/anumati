@@ -130,7 +130,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `build-tool` | Bash | allow one-shot frontend builds: `vite`/`next` require the `build` subcommand, `webpack`/`rollup`/`esbuild` build by default; reject dev/serve/preview/start/watch subcommands + `--watch`/`-w`/`--serve` (long-running, would hang); (+ cd && variant, pipe to consumers) | — |
 | `cd` | Bash | allow a bare `cd <dir>` where the resolved target is the cwd or a subfolder (no operators, no redirection, no `..` escaping cwd) | — |
 | `vitest` | Bash | allow `[npx] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked | — |
-| `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`) to a per-service read-only subcommand allowlist (list/describe/get/filter; s3 = `ls` only, s3api = metadata reads, no get-object); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
+| `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`, `dynamodb`, `lambda`) to a per-service read-only subcommand allowlist (list/describe/get/query/scan/filter; s3 = `ls` only, s3api = metadata reads, no get-object; dynamodb = get/query/scan/batch-get + describe/list, no put/update/delete/execute-statement; lambda = get/list only, no invoke/update/delete); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
 | `sleep` | Bash | allow a single bare `sleep <seconds>` (one integer arg); no operators/redirection — chaining is handled by evaluate() composition | — |
 
 ## Adding a new named matcher
