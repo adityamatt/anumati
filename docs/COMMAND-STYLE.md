@@ -87,8 +87,11 @@ Reserve Bash for things that genuinely need a shell.
   ```
   Allowed builtins include: `ls cat head tail wc file stat du df tree pwd which
   type basename dirname date grep rg sort uniq cut tr diff column find env
-  printenv realpath readlink nl fold comm tac`. No file redirection; pipes and
-  safe stream redirects (`2>/dev/null`, `2>&1`) are fine.
+  printenv realpath readlink nl fold comm tac`. A **read-only `sed`** (print /
+  delete / quit / line-number scripts, e.g. `sed -n '1,80p'`) also composes as a
+  stage — so `cat f | sed -n '1,80p' | grep foo` auto-approves; `sed -i` /
+  substitution / write / exec forms do not. No file redirection; pipes and safe
+  stream redirects (`2>/dev/null`, `2>&1`) are fine.
 
 - **Read-only git**, optionally piped to those builtins:
   ```bash

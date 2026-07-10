@@ -1,6 +1,7 @@
 import { basename } from "path";
 import { tokenize } from "./shell.js";
 import { hasUnsafeRedirection } from "./redirect.js";
+import { isReadOnlySed } from "./sed-safe.js";
 
 // Pure read-only output *consumers* that are safe to receive any command's
 // output via a pipe. These have no side effects, no network, and no file writes
@@ -19,9 +20,13 @@ export const SAFE_PIPE_CONSUMERS = new Set([
 ]);
 
 // True if `raw` is a single safe read-only consumer command (no unsafe
-// redirection). Used to validate each trailing pipe segment.
+// redirection). Used to validate each trailing pipe segment. A provably
+// read-only `sed` (e.g. `sed -n '1,80p'`) also qualifies — its full grammar is
+// vetted by isReadOnlySed, which rejects -i / write / exec / -f forms.
 export function isSafePipeConsumer(raw: string): boolean {
   if (hasUnsafeRedirection(raw)) return false;
   const argv = tokenize(raw);
-  return !!argv && SAFE_PIPE_CONSUMERS.has(basename(argv[0]));
+  if (!argv) return false;
+  if (SAFE_PIPE_CONSUMERS.has(basename(argv[0]))) return true;
+  return isReadOnlySed(raw);
 }

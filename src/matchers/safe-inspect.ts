@@ -1,8 +1,11 @@
 import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
+import { isReadOnlySed } from "../parser/sed-safe.js";
 
 // Read-only inspection builtins. Conservative allowlist — anything that can
-// write (sed -i, awk, tee, xargs) or run other programs is deliberately omitted.
+// write (awk, tee, xargs) or run other programs is deliberately omitted. `sed`
+// is handled specially below: only its provably read-only forms are accepted
+// (see isReadOnlySed), so `sed -i` / write / exec forms stay rejected.
 const SAFE_INSPECT = new Set([
   "ls", "cat", "head", "tail", "wc", "file", "stat", "du", "df",
   "tree", "pwd", "which", "type", "basename", "dirname", "date",
@@ -25,6 +28,10 @@ function isSafeInspectSegment(raw: string): boolean {
   if (!argv || argv.length === 0) return false;
 
   const cmd = argv[0];
+  // A provably read-only `sed` (sed -n '1,80p', etc.) is a valid inspection
+  // stage — vetted by its own grammar so a chain like
+  // `cat f | sed -n '1,80p' | grep foo` composes as one read-only pipeline.
+  if (cmd === "sed") return isReadOnlySed(raw);
   if (!SAFE_INSPECT.has(cmd)) return false;
 
   if (cmd === "find") {
