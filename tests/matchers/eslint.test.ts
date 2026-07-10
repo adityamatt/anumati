@@ -30,10 +30,10 @@ describe("matchEslint — allow (read-only lint)", () => {
 });
 
 describe("matchEslint — block (writes / unsafe shapes)", () => {
-  it("--fix (rewrites source)", () =>
+  it("--fix blocked by default (rewrites source)", () =>
     expect(matchEslint("npx eslint src --fix")).toBe(false));
 
-  it("--fix-dry-run", () =>
+  it("--fix-dry-run blocked by default", () =>
     expect(matchEslint("npx eslint . --fix-dry-run")).toBe(false));
 
   it("--init (scaffolds a config file)", () =>
@@ -61,4 +61,24 @@ describe("matchEslint — block (writes / unsafe shapes)", () => {
     expect(matchEslint("npx prettier --write .")).toBe(false));
 
   it("empty", () => expect(matchEslint("")).toBe(false));
+});
+
+describe("matchEslint — allow_write opt-in", () => {
+  it("--fix allowed when allowWrite=true", () =>
+    expect(matchEslint("npx eslint src --fix", true)).toBe(true));
+
+  it("--fix-dry-run allowed when allowWrite=true", () =>
+    expect(matchEslint("npx eslint . --fix-dry-run", true)).toBe(true));
+
+  it("cd && eslint --fix allowed when allowWrite=true", () =>
+    expect(matchEslint("cd /Users/a/repo && npx eslint src --fix 2>&1 | tail", true)).toBe(true));
+
+  it("plain lint still allowed when allowWrite=true", () =>
+    expect(matchEslint("npx eslint src", true)).toBe(true));
+
+  it("--init STILL blocked even when allowWrite=true (scaffolder, not a fix)", () =>
+    expect(matchEslint("npx eslint --init", true)).toBe(false));
+
+  it("--fix still rejects an unsafe pipe target even with allowWrite=true", () =>
+    expect(matchEslint("npx eslint src --fix | sh", true)).toBe(false));
 });

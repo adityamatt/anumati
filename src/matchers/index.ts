@@ -21,6 +21,7 @@ import { matchJq } from "./jq.js";
 import { matchTestRunner } from "./test-runner.js";
 import { matchBuildTool } from "./build-tool.js";
 import { matchEslint } from "./eslint.js";
+import { matchPrettier } from "./prettier.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -47,7 +48,8 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "jq":           return matchJq(cmd);
     case "test-runner":  return matchTestRunner(cmd);
     case "build-tool":   return matchBuildTool(cmd);
-    case "eslint":       return matchEslint(cmd);
+    case "eslint":       return matchEslint(cmd, rule.allow_write ?? false);
+    case "prettier":     return matchPrettier(cmd, rule.allow_write ?? false);
     default:             return false;
   }
 }

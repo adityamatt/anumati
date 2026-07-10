@@ -26,6 +26,14 @@ export interface Rule {
    * hard-blocked regardless of this list.
    */
   allowed_git_ops?: string[];
+  /**
+   * Opt into the in-place-write forms of a formatter/linter matcher:
+   * `eslint --fix`/`--fix-dry-run` and `prettier --write`/`-w`. Default false —
+   * these rewrite source files, so they are blocked unless a rule sets this
+   * true. (eslint `--init` stays blocked regardless — it is an interactive
+   * scaffolder, not a source fix.)
+   */
+  allow_write?: boolean;
   open?: OpenConfig;
   subagent_type?: string;
   desc?: string;

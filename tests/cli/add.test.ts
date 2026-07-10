@@ -64,6 +64,16 @@ describe("parseAddArgs", () => {
     expect(o.repos).toEqual(["o/r"]);
     expect(o.domains).toEqual(["x.com"]);
   });
+
+  it("parses --allow-write as a boolean flag (no value)", () => {
+    const o = parseAddArgs(["eslint", "--allow-write"]);
+    expect(o.allowWrite).toBe(true);
+  });
+
+  it("--allow-write is absent by default", () => {
+    const o = parseAddArgs(["eslint"]);
+    expect(o.allowWrite).toBeUndefined();
+  });
 });
 
 describe("applyAdd", () => {
@@ -100,6 +110,16 @@ describe("applyAdd", () => {
   it("nests open.allowed_paths for --paths", () => {
     applyAdd({ matcher: "python3-pipe", paths: ["/data/"], config: configPath });
     expect(read().allow![0].open).toEqual({ allowed_paths: ["/data/"] });
+  });
+
+  it("sets allow_write:true on the rule for --allow-write", () => {
+    applyAdd({ matcher: "eslint", allowWrite: true, config: configPath });
+    expect(read().allow![0]).toEqual({ tool: "Bash", matcher: "eslint", allow_write: true });
+  });
+
+  it("omits allow_write when not requested", () => {
+    applyAdd({ matcher: "prettier", config: configPath });
+    expect(read().allow![0].allow_write).toBeUndefined();
   });
 
   it("accumulates across multiple adds", () => {
