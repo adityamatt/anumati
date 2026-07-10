@@ -36,6 +36,7 @@ export const STARTER_RULES: Rule[] = [
   { tool: "Bash", matcher: "sed", desc: "Read-only sed (print/delete/quit; -i/write blocked)" },
   { tool: "Bash", matcher: "jq", desc: "JSON processing (jq <filter> [file])" },
   { tool: "Bash", matcher: "npx-tsc", desc: "TypeScript type checking (npx tsc --noEmit)" },
+  { tool: "Bash", matcher: "eslint", desc: "Lint ([npx] eslint …; --fix/--init blocked)" },
   { tool: "Bash", matcher: "cargo", desc: "cargo check/build/test/clippy/… (read-only/build)" },
   { tool: "Bash", matcher: "go", desc: "go build/test/vet/fmt/list/… (read-only/build)" },
   { tool: "Bash", matcher: "vitest", desc: "Run tests (npx vitest run …; watch mode blocked)" },
