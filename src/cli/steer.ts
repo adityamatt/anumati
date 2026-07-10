@@ -17,6 +17,7 @@ without a manual permission prompt:
 
 - **One command per Bash call** — avoid \`;\` / \`&&\` chains and multi-statement scripts. Use separate calls.
 - **No file redirections** — drop \`> file\`, \`>> file\`, \`2> file\`, \`< file\` (they write/read files). Stream redirects that only discard or merge output (\`2>/dev/null\`, \`>/dev/null\`, \`2>&1\`) are fine.
+- **No \`>\`/\`<\` inside quoted args** (commit messages, \`-m\` strings) — anumati reads any \`>\` as a file redirect, even quoted. Write arrows as words: \`webhook to SQS\` (not \`webhook -> SQS\`), \`greater than\` (not \`>\`).
 - **No \`echo\` section headers, no \`$(...)\` command substitution, no backticks.**
 - **Prefer dedicated tools over shelling out:** Read (not \`cat\`), Grep (not bash \`grep\`), Glob (not \`find\`/\`ls\`), Edit/Write (not \`echo >\`).
 - Pipes into read-only builtins (\`| head\`, \`| grep\`, \`| wc -l\`) are fine.
