@@ -13,6 +13,7 @@ export interface AddOptions {
   repos?: string[];
   paths?: string[];
   gitOps?: string[];
+  allowWrite?: boolean;
   config?: string;
 }
 
@@ -70,6 +71,7 @@ export function applyAdd(opts: AddOptions): AddResult {
   if (opts.scripts) mergeArray(r, "allowed_scripts", opts.scripts);
   if (opts.repos) mergeArray(r, "allowed_repos", opts.repos);
   if (opts.gitOps) mergeArray(r, "allowed_git_ops", opts.gitOps);
+  if (opts.allowWrite) r.allow_write = true;
   if (opts.paths) {
     if (!rule.open) rule.open = { allowed_paths: [] };
     mergeArray(rule.open as unknown as Record<string, unknown>, "allowed_paths", opts.paths);
@@ -115,6 +117,10 @@ export function parseAddArgs(args: string[]): AddOptions {
       opts.config = takeValue(args, ++i, arg);
       continue;
     }
+    if (arg === "--allow-write") {
+      opts.allowWrite = true;
+      continue;
+    }
     const key = LIST_FLAGS[arg];
     if (key) {
       const value = takeValue(args, ++i, arg);
@@ -135,7 +141,7 @@ export function runAdd(argv: string[]): void {
   const matcher = args[0];
   if (!matcher || matcher.startsWith("--")) {
     console.error(
-      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--modules X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--git-ops X,Y] [--config /path]",
+      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--modules X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--git-ops X,Y] [--allow-write] [--config /path]",
     );
     process.exit(1);
   }

@@ -69,6 +69,7 @@ selects a named matcher; the `allowed_*` fields parameterize it.
 | `allowed_packages`   | `pip3-install`                | Packages `pip install` may install (`"*"` = any)                                                                                                           |
 | `allowed_scripts`    | `npm-script`                  | `npm/pnpm/yarn run <script>` names (`"*"` = any)                                                                                                           |
 | `allowed_git_ops`    | `git-write`                   | git write subcommands to allow (`add`, `commit`, `branch`, `checkout`, …); network + destructive ops are always blocked                                    |
+| `allow_write`        | `eslint`, `prettier`          | `true` opts into the in-place-write forms (`eslint --fix`/`--fix-dry-run`, `prettier --write`/`-w`). Default `false` blocks them. eslint `--init` stays blocked regardless |
 | `allowed_repos`      | `gh`                          | `owner/repo` slugs allowed for `gh api repos/...` reads                                                                                                    |
 | `open.allowed_paths` | `python3-pipe`, `nodejs-pipe`, `cd` | Path prefixes: for `python3-pipe`/`nodejs-pipe`, files a script may read (`open()` / file-path `require()`); for `cd`, extra directory roots a `cd` may target (beyond the cwd)             |
 | `subagent_type`      | `Task`                        | Exact subagent type string                                                                                                                                 |
@@ -89,7 +90,8 @@ selects a named matcher; the `allowed_*` fields parameterize it.
 | `git-read`     | Bash | allow read-only git subcommands (status/log/diff/show/`worktree list`/…)                                                                                                                                                                          | —                                       |
 | `git-write`    | Bash | allow allowlisted git write ops (add/commit/branch/checkout/`worktree add`/…); network (push/pull/fetch) and destructive/force forms (reset --hard, branch -D, --amend, rebase, clean -f, `worktree remove`) always blocked                       | `allowed_git_ops`                       |
 | `npx-tsc`      | Bash | allow `npx tsc --noEmit` (+ `cd … &&` variant, pipe to builtins)                                                                                                                                                                                  | —                                       |
-| `eslint`       | Bash | allow `[npx] eslint <paths/flags>` (read-only lint; `--fix`/`--fix-dry-run`/`--init` blocked as they write) (+ `cd … &&` variant, pipe to builtins)                                                                                                | —                                       |
+| `eslint`       | Bash | allow `[npx] eslint <paths/flags>` (read-only lint; `--fix`/`--fix-dry-run` allowed only with `allow_write`, `--init` always blocked) (+ `cd … &&` variant, pipe to builtins)                                                                       | `allow_write`                           |
+| `prettier`     | Bash | allow `[npx] prettier <paths/flags>` (`--check`/stdout; `--write`/`-w` allowed only with `allow_write`) (+ `cd … &&` variant, pipe to builtins)                                                                                                    | `allow_write`                           |
 | `safe-inspect` | Bash | allow read-only inspection builtins (ls/cat/grep/rg/find/…)                                                                                                                                                                                       | —                                       |
 | `cd`           | Bash | allow a bare `cd <dir>` into the current working directory or a subfolder (or, via `open.allowed_paths`, into any configured root / subfolder — e.g. a sibling repo)                                                                              | `open.allowed_paths`                    |
 | `vitest`       | Bash | allow `[npx] vitest run [paths/flags]` (+ `cd … &&` variant, pipe to builtins); watch mode blocked                                                                                                                                                | —                                       |
@@ -237,7 +239,7 @@ init for the hooks to load.**
 The **starter config** seeds broadly-useful, low-risk rules in two tiers:
 
 - **Read-only / no-op / lint** — `safe-inspect`, `git-read`, `cd`, `sleep`,
-  `echo`, `sed`, `jq`, `npx-tsc`, `eslint`, `cargo`, `go`.
+  `echo`, `sed`, `jq`, `npx-tsc`, `eslint`, `prettier`, `cargo`, `go`.
 - **Build / test runners** — `vitest`, `test-runner` (pytest/jest), `npm-script`
   (`allowed_scripts: ["*"]`). These **execute the project's own code** — remove
   them if you'd rather approve test/build runs manually.
@@ -272,12 +274,15 @@ anumati add python3-pipe --imports pandas,numpy
 anumati add nodejs-pipe --modules os,fs
 anumati add pip3-install --packages flask
 anumati add git-write --git-ops add,commit,branch
+anumati add eslint --allow-write        # allow eslint --fix / prettier --write
 anumati add cargo
 ```
 
 Flags: `--domain`/`--domains`, `--imports`, `--modules`, `--packages`,
-`--scripts`, `--repos`, `--paths`, `--git-ops` (comma-separated or repeated).
-Targets `~/.claude/permissions.json` by default; override with `--config <path>`.
+`--scripts`, `--repos`, `--paths`, `--git-ops` (comma-separated or repeated),
+and `--allow-write` (a boolean flag for the `eslint`/`prettier` matchers —
+enables their in-place-write forms). Targets `~/.claude/permissions.json` by
+default; override with `--config <path>`.
 
 ### `anumati stats`
 

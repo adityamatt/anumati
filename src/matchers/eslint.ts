@@ -8,12 +8,17 @@ import { isSafePipeConsumer } from "../parser/pipe.js";
 // rewrite source files, and `--init` scaffolds a config file. Everything else
 // (paths, `--max-warnings`, `--format`, `--ext`, config selection, …) only
 // selects what to lint / how to report, so any other args are fine.
-const WRITE_FLAGS = new Set(["--fix", "--fix-dry-run", "--init"]);
+//
+// `--fix`/`--fix-dry-run` rewrite source in place — allowed ONLY when a rule
+// opts in via `allow_write: true`. `--init` is ALWAYS blocked regardless: it is
+// an interactive scaffolder that can install packages, not a source fix.
+const FIX_FLAGS = new Set(["--fix", "--fix-dry-run"]);
+const ALWAYS_BLOCKED_FLAGS = new Set(["--init"]);
 
 // A lint invocation is either `npx eslint …` or a direct `eslint …`. Unlike
 // vitest/build-tool there is no required subcommand — bare `eslint <paths>`
 // lints and exits, so only the write flags are rejected.
-function isEslintSegment(raw: string): boolean {
+function isEslintSegment(raw: string, allowWrite: boolean): boolean {
   if (hasUnsafeRedirection(raw)) return false;
 
   const argv = tokenize(raw);
@@ -25,7 +30,8 @@ function isEslintSegment(raw: string): boolean {
   if (basename(argv[i] ?? "") !== "eslint") return false;
 
   const rest = argv.slice(i + 1);
-  if (rest.some((a) => WRITE_FLAGS.has(a))) return false;
+  if (rest.some((a) => ALWAYS_BLOCKED_FLAGS.has(a))) return false;
+  if (!allowWrite && rest.some((a) => FIX_FLAGS.has(a))) return false;
   return true;
 }
 
@@ -35,7 +41,7 @@ function isCdSegment(raw: string): boolean {
   return !!argv && argv[0] === "cd" && argv.length === 2;
 }
 
-export function matchEslint(command: string): boolean {
+export function matchEslint(command: string, allowWrite = false): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
 
@@ -58,7 +64,7 @@ export function matchEslint(command: string): boolean {
   }
 
   // First (non-cd) segment must be an eslint invocation.
-  if (!isEslintSegment(segments[index].raw)) return false;
+  if (!isEslintSegment(segments[index].raw, allowWrite)) return false;
   index++;
 
   // Remaining segments must be piped safe consumers.
