@@ -23,6 +23,7 @@ import { matchGo } from "./matchers/go.js";
 import { matchGitRead } from "./matchers/git-read.js";
 import { matchSafeInspect } from "./matchers/safe-inspect.js";
 import { matchNpxTsc } from "./matchers/npx-tsc.js";
+import { matchEslint } from "./matchers/eslint.js";
 
 export interface Suggestion {
   /** The anumati CLI command to run to apply this suggestion */
@@ -274,6 +275,13 @@ function suggestNewRule(
     return noParamSuggestion(
       "npx-tsc",
       "Auto-approve npx tsc --noEmit type checks",
+      cmd,
+    );
+  }
+  if (!has("eslint") && matchEslint(cmd)) {
+    return noParamSuggestion(
+      "eslint",
+      "Auto-approve eslint lint runs (--fix/--init blocked)",
       cmd,
     );
   }

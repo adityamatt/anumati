@@ -44,6 +44,42 @@ describe("matchAws — s3 / s3api (allow pure reads)", () => {
   it("s3api list-objects-v2", () => expect(matchAws("aws s3api list-objects-v2 --bucket my-bucket")).toBe(true));
   it("s3api head-object", () => expect(matchAws("aws s3api head-object --bucket b --key k")).toBe(true));
   it("s3api get-bucket-location", () => expect(matchAws("aws s3api get-bucket-location --bucket b")).toBe(true));
+  it("s3api get-bucket-encryption", () =>
+    expect(
+      matchAws('aws s3api get-bucket-encryption --profile drashta-prod --region us-east-1 --bucket vst-forecast-na-prod-051370627181-us-east-1'),
+    ).toBe(true));
+  it("s3api get-public-access-block", () => expect(matchAws("aws s3api get-public-access-block --bucket b")).toBe(true));
+});
+
+describe("matchAws — sts (allow read-only)", () => {
+  it("get-caller-identity", () =>
+    expect(matchAws("aws sts get-caller-identity --profile drashta-prod")).toBe(true));
+});
+
+describe("matchAws — sts (block credential-minting)", () => {
+  it("assume-role", () => expect(matchAws("aws sts assume-role --role-arn arn:x --role-session-name s")).toBe(false));
+  it("get-session-token", () => expect(matchAws("aws sts get-session-token")).toBe(false));
+  it("get-federation-token", () => expect(matchAws("aws sts get-federation-token --name n")).toBe(false));
+});
+
+describe("matchAws — iam (allow read-only)", () => {
+  it("list-role-policies", () =>
+    expect(matchAws('aws iam list-role-policies --profile drashta-prod --role-name "DrashtaProdAppStack-query-worker-role" --output text')).toBe(true));
+  it("list-attached-role-policies", () =>
+    expect(matchAws('aws iam list-attached-role-policies --role-name x --query "AttachedPolicies[].PolicyName" --output text')).toBe(true));
+  it("get-role-policy", () =>
+    expect(matchAws('aws iam get-role-policy --role-name "DrashtaProdAppStack-query-worker-role" --policy-name P --output json')).toBe(true));
+  it("list-users", () => expect(matchAws("aws iam list-users")).toBe(true));
+  it("get-policy", () => expect(matchAws("aws iam get-policy --policy-arn arn:x")).toBe(true));
+});
+
+describe("matchAws — iam (block writes)", () => {
+  it("create-role", () => expect(matchAws("aws iam create-role --role-name x --assume-role-policy-document '{}'")).toBe(false));
+  it("delete-role", () => expect(matchAws("aws iam delete-role --role-name x")).toBe(false));
+  it("attach-role-policy", () => expect(matchAws("aws iam attach-role-policy --role-name x --policy-arn arn:y")).toBe(false));
+  it("put-role-policy", () => expect(matchAws("aws iam put-role-policy --role-name x --policy-name p --policy-document '{}'")).toBe(false));
+  it("create-access-key", () => expect(matchAws("aws iam create-access-key --user-name u")).toBe(false));
+  it("delete-user", () => expect(matchAws("aws iam delete-user --user-name u")).toBe(false));
 });
 
 describe("matchAws — s3 / s3api (block writes & local side effects)", () => {
@@ -149,8 +185,8 @@ describe("matchAws — block out-of-scope services", () => {
   it("ec2 describe-instances is rejected (service not allowlisted)", () => {
     expect(matchAws("aws ec2 describe-instances")).toBe(false);
   });
-  it("iam list-users is rejected (service not allowlisted)", () => {
-    expect(matchAws("aws iam list-users")).toBe(false);
+  it("secretsmanager get-secret-value is rejected (service not allowlisted)", () => {
+    expect(matchAws("aws secretsmanager get-secret-value --secret-id x")).toBe(false);
   });
 });
 
