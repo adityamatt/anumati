@@ -9,6 +9,10 @@ describe("isSafePipeConsumer — allow", () => {
   it("allows an absolute path to a consumer (basename match)", () => {
     expect(isSafePipeConsumer("/usr/bin/grep foo")).toBe(true);
   });
+
+  it("allows a read-only sed (print range)", () => {
+    expect(isSafePipeConsumer("sed -n '1,80p'")).toBe(true);
+  });
 });
 
 describe("isSafePipeConsumer — block", () => {
@@ -20,6 +24,11 @@ describe("isSafePipeConsumer — block", () => {
 
   it("blocks a consumer with a file redirect", () => {
     expect(isSafePipeConsumer("grep foo > out.txt")).toBe(false);
+  });
+
+  it("blocks a write-form sed (not read-only)", () => {
+    expect(isSafePipeConsumer("sed -i 's/a/b/' file")).toBe(false);
+    expect(isSafePipeConsumer("sed 's/a/b/'")).toBe(false);
   });
 
   it("blocks empty", () => {

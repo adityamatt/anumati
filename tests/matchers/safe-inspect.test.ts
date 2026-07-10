@@ -78,6 +78,26 @@ describe("matchSafeInspect — allow", () => {
   it("mixed | ; && chain of safe reads", () => {
     expect(matchSafeInspect("cat a | grep b; ls && wc -l c")).toBe(true);
   });
+
+  it("read-only sed as a pipe stage", () => {
+    expect(matchSafeInspect("cat foo | sed -n '1,80p' | grep bar")).toBe(true);
+  });
+
+  it("standalone read-only sed", () => {
+    expect(matchSafeInspect("sed -n '1,80p' file")).toBe(true);
+  });
+
+  it("read-only sed leading a chain", () => {
+    expect(matchSafeInspect("sed -n '1,80p' file | head")).toBe(true);
+  });
+
+  it("cat 2>/dev/null | sed -n range | grep (the original passthrough case)", () => {
+    expect(
+      matchSafeInspect(
+        "cat /a/b/http.d.ts 2>/dev/null | sed -n '1,80p' | grep -nA25 \"interface HttpRequest\"",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("matchSafeInspect — block", () => {
@@ -133,8 +153,16 @@ describe("matchSafeInspect — block", () => {
     expect(matchSafeInspect("ls src & cat foo")).toBe(false);
   });
 
-  it("sed is not allowed", () => {
+  it("in-place sed -i is not allowed", () => {
     expect(matchSafeInspect("sed -i 's/a/b/' file")).toBe(false);
+  });
+
+  it("sed substitution is not allowed", () => {
+    expect(matchSafeInspect("cat f | sed 's/a/b/'")).toBe(false);
+  });
+
+  it("sed write command in a chain blocks the chain", () => {
+    expect(matchSafeInspect("cat f | sed -n '1,5w out.txt' | grep x")).toBe(false);
   });
 
   it("awk is not allowed", () => {
