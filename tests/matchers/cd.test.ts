@@ -63,3 +63,28 @@ describe("matchCd — block", () => {
   it("command substitution blocked by parser", () =>
     expect(matchCd("cd $(echo /etc)", CWD)).toBe(false));
 });
+
+describe("matchCd — allowed_paths (configured roots)", () => {
+  const EXTRA = ["/Users/aditya/DrashtaCombined/drashta"];
+
+  it("cd into a configured root itself", () =>
+    expect(matchCd("cd /Users/aditya/DrashtaCombined/drashta", CWD, EXTRA)).toBe(true));
+
+  it("cd into a subfolder of a configured root", () =>
+    expect(matchCd("cd /Users/aditya/DrashtaCombined/drashta/src/DrashtaCDK", CWD, EXTRA)).toBe(true));
+
+  it("cwd still works when allowed_paths is set", () =>
+    expect(matchCd("cd /Users/aditya/project/src", CWD, EXTRA)).toBe(true));
+
+  it("still blocks paths outside both cwd and configured roots", () =>
+    expect(matchCd("cd /etc", CWD, EXTRA)).toBe(false));
+
+  it("still blocks a prefix-sibling of a configured root", () =>
+    expect(matchCd("cd /Users/aditya/DrashtaCombined/drashta-evil", CWD, EXTRA)).toBe(false));
+
+  it("works with empty cwd when a configured root matches (absolute)", () =>
+    expect(matchCd("cd /Users/aditya/DrashtaCombined/drashta/src", "", EXTRA)).toBe(true));
+
+  it("multiple configured roots", () =>
+    expect(matchCd("cd /srv/repo-b/pkg", CWD, ["/srv/repo-a", "/srv/repo-b"])).toBe(true));
+});

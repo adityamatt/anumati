@@ -37,7 +37,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "npm-script":   return matchNpmScript(cmd, rule.allowed_scripts ?? []);
     case "cargo":        return matchCargo(cmd);
     case "go":           return matchGo(cmd);
-    case "cd":           return matchCd(cmd, input.cwd ?? "");
+    case "cd":           return matchCd(cmd, input.cwd ?? "", rule.open?.allowed_paths ?? []);
     case "vitest":       return matchVitest(cmd);
     case "aws":          return matchAws(cmd);
     case "sleep":        return matchSleep(cmd);

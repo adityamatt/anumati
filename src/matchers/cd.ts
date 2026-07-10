@@ -3,18 +3,18 @@ import { parseCompound, tokenize } from "../parser/shell.js";
 
 /**
  * Approve a Bash command that is *only* `cd <dir>`, where <dir> resolves to the
- * current working directory or a folder beneath it. This covers the common case
- * of Claude changing into the directory it is already operating in (or a
- * subfolder) — a no-op for safety, since shell state does not persist between
- * Bash calls anyway.
+ * current working directory (or a folder beneath it), or to any configured
+ * `allowedPaths` root (or a folder beneath one). The cwd case covers Claude
+ * changing into the directory it is already operating in; `allowedPaths` opts in
+ * additional roots — e.g. a sibling repo you frequently `cd` into. Either way
+ * this is a no-op for safety, since shell state does not persist between Bash
+ * calls anyway.
  *
  * Deliberately narrow: a single bare `cd <one-arg>` segment, no operators, no
- * redirection, and no escaping the cwd subtree via `..`. A `cd` target outside
- * cwd (e.g. `cd /etc`, `cd ~`, `cd ..`) is not approved.
+ * redirection. A relative target is resolved against cwd, so `cd ..` and other
+ * escapes out of cwd are only approved when they land inside an allowed root.
  */
-export function matchCd(command: string, cwd: string): boolean {
-  if (!cwd) return false;
-
+export function matchCd(command: string, cwd: string, allowedPaths: string[] = []): boolean {
   const segments = parseCompound(command);
   if (!segments) return false;
 
@@ -28,8 +28,18 @@ export function matchCd(command: string, cwd: string): boolean {
   // Exactly `cd <dir>` — reject bare `cd` (goes home) and extra args.
   if (!argv || argv[0] !== "cd" || argv.length !== 2) return false;
 
-  const root = path.resolve(cwd);
-  const target = path.resolve(root, argv[1]);
+  // The roots the target may resolve into: cwd (when known) plus any configured
+  // allowed paths. A relative target still resolves against cwd, but is then
+  // accepted if it lands under ANY of these roots.
+  const roots: string[] = [];
+  if (cwd) roots.push(path.resolve(cwd));
+  for (const p of allowedPaths) {
+    if (p) roots.push(path.resolve(p));
+  }
+  if (roots.length === 0) return false;
 
-  return target === root || target.startsWith(root + path.sep);
+  const base = cwd ? path.resolve(cwd) : path.resolve(roots[0]);
+  const target = path.resolve(base, argv[1]);
+
+  return roots.some((root) => target === root || target.startsWith(root + path.sep));
 }
