@@ -52,6 +52,12 @@ Reserve Bash for things that genuinely need a shell.
    that only discard or merge output — `2>/dev/null`, `>/dev/null`, `2>&1`,
    `>&2` — pass fine (e.g. `grep -rn foo src 2>/dev/null` auto-approves).
 
+   This also fires on a `>` or `<` **inside a quoted argument** — anumati scans
+   the raw command text and can't tell a quoted arrow from a real redirect. A
+   commit message like `git commit -m "webhook -> SQS path unchanged"` falls
+   through on the `->`. Write arrows and comparisons as words instead: `webhook
+   to SQS`, `A then B`, `less than` / `greater than`.
+
 2. **`||` and backgrounding `&`.** Read-only inspection chains through pipes
    `|` and sequencing `;` / `&&` **only when every segment is itself a safe
    read** — but `||` and a trailing `&` are never accepted. (Build/test matchers
@@ -184,7 +190,7 @@ are cleaner and never trip a shell-parsing edge case.
 ## Quick rules of thumb
 
 - One command per Bash call; use separate calls instead of `;` / `&&` chains.
-- No file redirects (`> file`, `>> file`, `2> file`, `< file`); stream redirects (`2>/dev/null`, `2>&1`) are fine.
+- No file redirects (`> file`, `>> file`, `2> file`, `< file`); stream redirects (`2>/dev/null`, `2>&1`) are fine. Also avoid `>`/`<` inside quoted args (e.g. `->` in a commit message) — write them as words.
 - No `echo` headers, no `$(...)`, no backticks.
 - Reach for **Read / Grep / Glob / Edit / Write** before shelling out.
 - Pipes into read-only builtins (`| head`, `| grep`, `| wc -l`) are fine.
