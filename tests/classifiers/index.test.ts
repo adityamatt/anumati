@@ -32,8 +32,10 @@ describe("classify — safe builtins", () => {
 });
 
 describe("classify — dangerous", () => {
+  // python3/node are handled separately below: a non-flag first arg makes them
+  // a script invocation, so `python3 some args` is NOT dangerous.
   const dangerous = ["sh", "bash", "zsh", "fish",
-    "python", "python3", "node", "ruby", "perl",
+    "ruby", "perl",
     "sudo", "su", "eval", "exec", "env"];
 
   for (const cmd of dangerous) {
@@ -57,9 +59,35 @@ describe("classify — nodejs", () => {
   it("classifies node script.js as nodejs-script", () => {
     expect(classify("node script.js").kind).toBe("nodejs-script");
   });
+  it("classifies node script.js with args as nodejs-script", () => {
+    expect(classify("node script.js --out /tmp/x --quiet").kind).toBe("nodejs-script");
+  });
+  it("treats a script's own -e/-p args as script args, not node flags", () => {
+    // First arg is the script → script kind; the -e belongs to the script.
+    expect(classify("node cli.js -e foo").kind).toBe("nodejs-script");
+  });
   it("classifies bare/flagged node as dangerous", () => {
     expect(classify("node").kind).toBe("dangerous");
     expect(classify("node --inspect app.js").kind).toBe("dangerous");
+  });
+});
+
+describe("classify — python3", () => {
+  it("classifies python3 -c as python3-c", () => {
+    expect(classify(`python3 -c "print(1)"`).kind).toBe("python3-c");
+  });
+  it("classifies python3 script.py as python3-script", () => {
+    expect(classify("python3 script.py").kind).toBe("python3-script");
+  });
+  it("classifies python3 script.py with args as python3-script", () => {
+    expect(classify("python3 script.py --cwd /tmp --quiet").kind).toBe("python3-script");
+  });
+  it("treats a script's own -c arg as a script arg, not python's -c", () => {
+    expect(classify("python3 tool.py -c config.ini").kind).toBe("python3-script");
+  });
+  it("classifies bare/flagged python3 as dangerous", () => {
+    expect(classify("python3").kind).toBe("dangerous");
+    expect(classify("python3 -m http.server").kind).toBe("dangerous");
   });
 });
 
