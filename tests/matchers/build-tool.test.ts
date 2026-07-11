@@ -11,6 +11,11 @@ describe("matchBuildTool — allow (one-shot build)", () => {
   it("webpack with flags", () => expect(matchBuildTool("npx webpack --mode production")).toBe(true));
   it("rollup -c", () => expect(matchBuildTool("rollup -c")).toBe(true));
   it("esbuild bundle", () => expect(matchBuildTool("esbuild src/x.ts --bundle")).toBe(true));
+  // Real passthrough-log shapes (triage npx examples) — the exact safe subset
+  // build-tool must admit so `npx vite build` stops falling through.
+  it("npx vite build 2>&1 | tail -15", () => expect(matchBuildTool("npx vite build 2>&1 | tail -15")).toBe(true));
+  it("npx vite build 2>&1 | tail -3", () => expect(matchBuildTool("npx vite build 2>&1 | tail -3")).toBe(true));
+  it("npx vite build 2>&1 | tail -2", () => expect(matchBuildTool("npx vite build 2>&1 | tail -2")).toBe(true));
 });
 
 describe("matchBuildTool — block long-running / server modes", () => {
