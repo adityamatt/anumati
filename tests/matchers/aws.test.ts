@@ -181,6 +181,66 @@ describe("matchAws — lambda (block writes & invokes)", () => {
   it("publish-version", () => expect(matchAws("aws lambda publish-version --function-name x")).toBe(false));
 });
 
+describe("matchAws — cloudformation (allow read-only)", () => {
+  it("describe-stacks with query/output flags", () => {
+    expect(
+      matchAws(
+        `aws cloudformation describe-stacks --profile drashta-alpha --region us-west-2 --stack-name BONESBootstrap-9690717-624351986350-us-west-2 --query "Stacks[0].StackStatus" --output text`,
+      ),
+    ).toBe(true);
+  });
+  it("list-stacks", () => {
+    expect(
+      matchAws(
+        `aws cloudformation list-stacks --profile drashta-alpha --region us-west-2 --query "StackSummaries[?StackStatus!='DELETE_COMPLETE'].StackName" --output text`,
+      ),
+    ).toBe(true);
+  });
+  it("describe-stack-resources", () => {
+    expect(
+      matchAws(
+        `aws cloudformation describe-stack-resources --profile drashta-alpha --region us-west-2 --stack-name BONESBootstrap-9690717-624351986350-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text`,
+      ),
+    ).toBe(true);
+  });
+  it("describe-stacks | head", () => {
+    expect(
+      matchAws(
+        `aws cloudformation describe-stacks --profile drashta-alpha --region us-west-2 --query "Stacks[?contains(StackName,'BONESBootstrap')].StackName" --output text | head`,
+      ),
+    ).toBe(true);
+  });
+  it("describe-stack-resources | tr | grep", () => {
+    expect(
+      matchAws(
+        `aws cloudformation describe-stack-resources --profile drashta-prod --region us-west-2 --stack-name BONESBootstrap-9690717-879866610279-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text | tr '\\t' '\\n' | grep -i "ChangeSetRole"`,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("matchAws — cloudformation (block writes)", () => {
+  it("create-stack", () =>
+    expect(matchAws("aws cloudformation create-stack --stack-name x --template-body '{}'")).toBe(false));
+  it("update-stack", () =>
+    expect(matchAws("aws cloudformation update-stack --stack-name x --template-body '{}'")).toBe(false));
+  it("delete-stack", () => expect(matchAws("aws cloudformation delete-stack --stack-name x")).toBe(false));
+  it("deploy", () => expect(matchAws("aws cloudformation deploy --stack-name x --template-file t.yaml")).toBe(false));
+  it("execute-change-set", () =>
+    expect(matchAws("aws cloudformation execute-change-set --change-set-name c --stack-name x")).toBe(false));
+  it("cancel-update-stack", () =>
+    expect(matchAws("aws cloudformation cancel-update-stack --stack-name x")).toBe(false));
+  it("set-stack-policy", () =>
+    expect(matchAws("aws cloudformation set-stack-policy --stack-name x --stack-policy-body '{}'")).toBe(false));
+  it("describe-stacks | python3 (unsafe pipe consumer)", () => {
+    expect(
+      matchAws(
+        `aws cloudformation describe-stacks --stack-name x --output json | python3 -c "import sys,json; print(json.load(sys.stdin))"`,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("matchAws — block out-of-scope services", () => {
   it("ec2 describe-instances is rejected (service not allowlisted)", () => {
     expect(matchAws("aws ec2 describe-instances")).toBe(false);

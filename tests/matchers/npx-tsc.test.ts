@@ -9,6 +9,10 @@ describe("matchNpxTsc — allowed", () => {
   it("matches with 2>&1 piped to a consumer", () => expect(matchNpxTsc("npx tsc --noEmit 2>&1 | head")).toBe(true));
   it("matches cd && npx tsc -p tsconfig 2>&1 | head", () =>
     expect(matchNpxTsc("cd /a && npx tsc --noEmit -p tsconfig.json 2>&1 | head")).toBe(true));
+  // Real passthrough-log shape (triage npx examples): the `npx tsc --noEmit`
+  // half of the `tsc && vite build` compounds must match on its own.
+  it("matches npx tsc --noEmit 2>&1 | head", () =>
+    expect(matchNpxTsc("npx tsc --noEmit 2>&1 | head")).toBe(true));
 });
 
 describe("matchNpxTsc — blocked", () => {

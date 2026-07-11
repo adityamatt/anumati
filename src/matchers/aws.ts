@@ -170,6 +170,29 @@ const READ_ONLY_SUBCOMMANDS: Record<string, Set<string>> = {
     "list-code-signing-configs",
     "list-functions-by-code-signing-config",
   ]),
+  // CloudFormation reads only. describe-*/list-*/get-* read stack, change-set,
+  // stack-set, template, and export/import metadata. Every mutating verb is
+  // excluded — create/update/delete-stack, deploy, execute-change-set,
+  // cancel-update-stack, and set-stack-policy all change or roll out
+  // infrastructure.
+  cloudformation: new Set([
+    "describe-stacks",
+    "describe-stack-resources",
+    "describe-stack-resource",
+    "describe-stack-events",
+    "describe-change-set",
+    "describe-stack-set",
+    "describe-stack-instance",
+    "list-stacks",
+    "list-stack-resources",
+    "list-change-sets",
+    "list-stack-sets",
+    "list-exports",
+    "list-imports",
+    "get-template",
+    "get-template-summary",
+    "get-stack-policy",
+  ]),
 };
 
 function isAwsSegment(raw: string): boolean {

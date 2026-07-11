@@ -409,3 +409,50 @@ describe("evaluate — sequential composition (&& / ; / ||)", () => {
     expect(evaluate(bash("git log | someunknowncmd"), rules).decision).toBeNull();
   });
 });
+
+// The real npx passthrough-log shapes are covered by the two EXISTING matchers
+// (build-tool + npx-tsc) rather than a new "npx" matcher: `npx vite build` is a
+// build-tool invocation and `npx tsc --noEmit` is an npx-tsc one. Single-segment
+// forms hit the whole-command path; the `tsc && vite build` compounds compose
+// via evaluate()'s && splitting once both rules (and cd) are present.
+describe("evaluate — npx vite build / tsc via build-tool + npx-tsc", () => {
+  const BUILD: Rule = { tool: "Bash", matcher: "build-tool" };
+  const TSC: Rule = { tool: "Bash", matcher: "npx-tsc" };
+  const CD: Rule = { tool: "Bash", matcher: "cd", open: { allowed_paths: ["/Users/adityatx"] } };
+  const rules = [BUILD, TSC, CD];
+
+  function bashCwd(command: string): HookInput {
+    return { session_id: "t", tool_name: "Bash", tool_input: { command }, cwd: "/Users/adityatx" };
+  }
+
+  it("allows npx vite build 2>&1 | tail -15", () => {
+    expect(evaluate(bash("npx vite build 2>&1 | tail -15"), rules).decision).toBe("allow");
+  });
+
+  it("allows npx vite build 2>&1 | tail -4", () => {
+    expect(evaluate(bash("npx vite build 2>&1 | tail -4"), rules).decision).toBe("allow");
+  });
+
+  it("allows npx tsc --noEmit 2>&1 | head && npx vite build 2>&1 | tail -3 (composes)", () => {
+    const cmd = "npx tsc --noEmit 2>&1 | head && npx vite build 2>&1 | tail -3";
+    expect(evaluate(bash(cmd), rules).decision).toBe("allow");
+  });
+
+  it("allows cd <dir> && npx tsc --noEmit … && npx vite build … (composes)", () => {
+    const cmd =
+      "cd /Users/adityatx/adityatx/DrashtaCombined/Harmony-drashta/src/Harmony-drashta && npx tsc --noEmit 2>&1 | head && npx vite build 2>&1 | tail -2";
+    expect(evaluate(bashCwd(cmd), rules).decision).toBe("allow");
+  });
+
+  it("still blocks the dev-server / watch forms these rules must never admit", () => {
+    expect(evaluate(bash("npx vite"), rules).decision).toBeNull();
+    expect(evaluate(bash("npx vite dev"), rules).decision).toBeNull();
+    expect(evaluate(bash("npx vite build --watch"), rules).decision).toBeNull();
+  });
+
+  it("still blocks a file redirect and a bad chained sub-command", () => {
+    expect(evaluate(bash("npx vite build > out.log"), rules).decision).toBeNull();
+    expect(evaluate(bash("npx vite build && rm -rf /"), rules).decision).toBeNull();
+    expect(evaluate(bash("npx tsc && npx vite build"), rules).decision).toBeNull();
+  });
+});
