@@ -104,4 +104,12 @@ describe("matchNodejsPipe — script file", () => {
   it("rejects when the script cannot be read", () => {
     expect(matchNodejsPipe("node missing.js", ["path"], dir)).toBe(false);
   });
+
+  it("allows a safe script invoked with arguments", () => {
+    expect(matchNodejsPipe("node safe.js --out /tmp/x --quiet", ["path"], dir)).toBe(true);
+  });
+
+  it("validates the script (not its args) when args are present", () => {
+    expect(matchNodejsPipe("node unsafe.js --out /tmp/x", ["path", "fs"], dir)).toBe(false);
+  });
 });

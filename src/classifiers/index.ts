@@ -35,25 +35,31 @@ export function classify(raw: string): ClassifiedCommand {
     return { kind: "dangerous", argv, raw };
   }
   if (cmd === "python3") {
+    // script file: python3 script.py [args...]. When the first arg is a
+    // non-flag it is the script path; everything after it is passed to the
+    // script (sys.argv), NOT interpreted as a python flag. Checking this BEFORE
+    // -c is required: in `python3 script.py -c x` the `-c` belongs to the
+    // script, so it must not be mistaken for python's own -c.
+    if (argv.length >= 2 && !argv[1].startsWith("-")) {
+      return { kind: "python3-script", argv, raw };
+    }
     const dashCIdx = argv.indexOf("-c");
     if (dashCIdx !== -1 && argv[dashCIdx + 1] !== undefined) {
       return { kind: "python3-c", argv, raw };
     }
-    // script file: python3 script.py (no flags other than the script)
-    if (argv.length === 2 && !argv[1].startsWith("-")) {
-      return { kind: "python3-script", argv, raw };
-    }
     return { kind: "dangerous", argv, raw };
   }
   if (cmd === "node") {
+    // script file: node script.js [args...]. A leading non-flag arg is the
+    // script path; trailing args go to process.argv, not to node. Checked
+    // before -e/-p for the same reason as python3 above.
+    if (argv.length >= 2 && !argv[1].startsWith("-")) {
+      return { kind: "nodejs-script", argv, raw };
+    }
     // Inline eval: -e/--eval "code" (also -p/--print, which evals then prints).
     const evalIdx = argv.findIndex((a) => a === "-e" || a === "--eval" || a === "-p" || a === "--print");
     if (evalIdx !== -1 && argv[evalIdx + 1] !== undefined) {
       return { kind: "nodejs-e", argv, raw };
-    }
-    // script file: node script.js (the sole non-flag arg)
-    if (argv.length === 2 && !argv[1].startsWith("-")) {
-      return { kind: "nodejs-script", argv, raw };
     }
     return { kind: "dangerous", argv, raw };
   }
