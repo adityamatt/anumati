@@ -12,18 +12,30 @@ export const meta = {
 };
 
 // ── Inputs (all optional; args overrides defaults) ────────────────────────────
+// This workflow is designed to be run with NO args — just "run the refine
+// workflow". Everything it needs it derives itself (the branch stamp comes from
+// the triage agent, which has shell access; Date.now() is unavailable here).
 const REPO = args?.repo ?? '/Users/adityatx/adityatx/open-source/anumati';
 const LOG = args?.log ?? '/Users/adityatx/.claude/anumati-passthrough.jsonl';
 const CONFIG = args?.config ?? '/Users/adityatx/.claude/permissions.json';
-// A date-stamped branch name — Date.now() is unavailable in workflow scripts, so
-// the caller passes `stamp`; fall back to a fixed label if absent.
-const STAMP = args?.stamp ?? 'latest';
-const BRANCH = `anumati-triage/${STAMP}`;
 const APPLY_CONFIG = args?.applyConfig ?? true; // auto-apply verified config extensions
 const MAX_CANDIDATES = args?.maxCandidates ?? 12; // cap implementation units per run
 
 const REPORT = `${REPO}/triage-report.md`;
 const JSON_OUT = `${REPO}/triage-result.json`;
+
+// Files the workflow itself owns — the triage script, this workflow, its doc,
+// and its scratch outputs. These must NEVER be staged by the Ship phase; only
+// files that the Implement phase actually created/modified get committed. (They
+// are already tracked on main, but listing them keeps the guard explicit.)
+const NEVER_STAGE = [
+  'workflows/refine-matchers.js',
+  'scripts/triage-passthrough.js',
+  'docs/REFINE-MATCHERS.md',
+  'triage-report.md',
+  'triage-result.json',
+  'package.json',
+];
 
 // The triage script writes the full, faithful candidate data (examples, reasons,
 // config deltas) to JSON_OUT on disk. Downstream agents READ THAT FILE directly
@@ -38,10 +50,14 @@ const JSON_OUT = `${REPO}/triage-result.json`;
 const TRIAGE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['ok', 'totals', 'configExtensionCount', 'codeCandidateLeads'],
+  required: ['ok', 'stamp', 'totals', 'configExtensionCount', 'codeCandidateLeads'],
   properties: {
     ok: { type: 'boolean' },
     error: { type: 'string' },
+    // Branch-name stamp: output of `date +%Y%m%d-%H%M%S` run by the agent, so
+    // each run gets a unique branch without relying on Date.now() (unavailable
+    // in workflow scripts) or a caller-supplied arg.
+    stamp: { type: 'string' },
     totals: {
       type: 'object',
       additionalProperties: true,
@@ -107,10 +123,11 @@ log('Building anumati and running deterministic triage over the passthrough log�
 const triage = await agent(
   `Run a deterministic triage step in the repo ${REPO}. Do EXACTLY this and nothing else:
 
-1. Run: npm run build            (cwd ${REPO})
-2. Run: node scripts/triage-passthrough.js --log "${LOG}" --config "${CONFIG}" --cwd "${REPO}" --out "${REPORT}" --json "${JSON_OUT}"
-3. Read ${JSON_OUT}. It has { totals, configExtensions[], codeCandidates[] }.
-4. Return ONLY: ok=true, the totals object, configExtensionCount = configExtensions.length, and codeCandidateLeads = the "lead" field of each entry in codeCandidates IN ORDER (do not reorder, do not include any other candidate detail — downstream steps read the file themselves).
+1. Run: date +%Y%m%d-%H%M%S    — capture its output verbatim as the "stamp".
+2. Run: npm run build            (cwd ${REPO})
+3. Run: node scripts/triage-passthrough.js --log "${LOG}" --config "${CONFIG}" --cwd "${REPO}" --out "${REPORT}" --json "${JSON_OUT}"
+4. Read ${JSON_OUT}. It has { totals, configExtensions[], codeCandidates[] }.
+5. Return ONLY: ok=true, stamp (from step 1), the totals object, configExtensionCount = configExtensions.length, and codeCandidateLeads = the "lead" field of each entry in codeCandidates IN ORDER (do not reorder, do not include any other candidate detail — downstream steps read the file themselves).
 
 Do NOT analyze safety, do NOT edit source, do NOT summarize the examples. If build or the script fails, return ok=false with the error text.`,
   { label: 'triage:run', phase: 'Triage', schema: TRIAGE_SCHEMA },
@@ -120,6 +137,10 @@ if (!triage || !triage.ok) {
   log(`Triage failed: ${triage?.error ?? 'no result'}. Aborting.`);
   return { aborted: true, reason: triage?.error ?? 'triage produced no result' };
 }
+
+const STAMP = (triage.stamp && /^[0-9-]+$/.test(triage.stamp)) ? triage.stamp : 'latest';
+const BRANCH = `anumati-triage/${STAMP}`;
+log(`Branch for this run: ${BRANCH}`);
 
 const totals = triage.totals ?? {};
 const leads = (triage.codeCandidateLeads ?? []).slice(0, MAX_CANDIDATES);
@@ -284,18 +305,46 @@ if (!verify?.pass) {
   };
 }
 
-const ship = await agent(
-  `Commit the matcher improvements in ${REPO} on a NEW branch and open a PR. Be surgical about staging — the working tree contains unrelated changes (a package.json version edit) that must NOT be included.
+// Compute the EXACT set of files to stage — deterministically, in the script,
+// not by the agent. Only files the Implement phase reported touching, with the
+// workflow-owned / unrelated files filtered out. The agent runs `git add` on
+// exactly this list and nothing else.
+const stageList = [...new Set(done.flatMap((r) => r.files ?? []))]
+  .map((f) => f.replace(/^\.?\//, '')) // normalize any leading ./ or /
+  .filter((f) => !NEVER_STAGE.includes(f));
 
+if (stageList.length === 0) {
+  log('Implementation reported no stageable files (all touched files are workflow-owned or excluded). Not committing.');
+  return {
+    branch: null, prUrl: null, committed: false, reason: 'no stageable files',
+    totals, configApplied, verify, report: REPORT,
+    implemented: done.map((r) => r.lead),
+  };
+}
+
+// Commit title from the actual implemented leads — no placeholder.
+const leadNames = done.map((r) => r.lead).join(', ');
+const commitTitle = `feat: auto-approve ${leadNames} from passthrough triage`;
+const addCommands = stageList.map((f) => `git add ${f}`).join('\n   ');
+
+log(`Staging ${stageList.length} file(s): ${stageList.join(', ')}`);
+
+const ship = await agent(
+  `Commit ALREADY-WRITTEN, ALREADY-VERIFIED matcher changes in ${REPO} on a new branch and open a PR. Do NOT edit any source — only run git/gh. The working tree contains unrelated changes (e.g. a package.json version edit) that must NOT be included.
+
+Run these steps in order:
 1. git checkout -b ${BRANCH}
-2. Stage ONLY the matcher/test/doc files the implementation phase created or modified, plus scripts/triage-passthrough.js, workflows/refine-matchers.js, and docs/REFINE-MATCHERS.md if untracked. Files touched by implementation:
-${done.flatMap((r) => (r.files ?? []).map((f) => `   - ${f}`)).join('\n') || '   (inspect `git status`; stage only src/matchers, src/parser, tests, AGENT.md, docs)'}
-   Use explicit \`git add <path>\` per file. Do NOT run \`git add -A\` or \`git add .\`. Do NOT stage package.json.
-3. Run \`git status\` and confirm package.json is NOT staged; if it is, unstage it.
-4. Commit: "feat: auto-approve <leads> from passthrough triage" with a body listing each matcher added/fixed and noting config extensions were applied separately.
-5. git push -u origin ${BRANCH}
-6. gh pr create against main: title matching the commit; body summarizing the triage counts (resolved/config/code/unapprovable), which config extensions were auto-applied, which matchers were implemented, that the full suite passed, and linking ${REPORT}.
-7. Return the branch name and PR URL.
+2. Stage EXACTLY these files and NO others — run each command verbatim:
+   ${addCommands}
+   Do NOT run \`git add -A\`, \`git add .\`, or \`git add\` on any other path. In particular do NOT stage: ${NEVER_STAGE.join(', ')}.
+3. Run \`git status --short\`. Verify that the staged set (lines starting with a staged-status letter in column 1) is EXACTLY these ${stageList.length} file(s): ${stageList.join(', ')}. If anything else is staged, unstage it with \`git restore --staged <path>\`. If any of the ${stageList.length} is missing from the index, \`git add\` it again.
+4. Commit with this exact title (use -m for the title, a second -m for the body):
+   Title: ${JSON.stringify(commitTitle)}
+   Body: list each matcher added/fixed (${done.map((r) => `${r.lead} → ${r.matcher ?? 'n/a'} (+${r.testsAdded ?? 0} tests)`).join('; ')}); note that verified config extensions were applied to the live config separately (not in this commit); note the full suite passed (${verify?.testsPassed ?? '?'} tests, 0 failures).
+5. Run \`git show --stat HEAD\` and confirm the commit contains exactly the ${stageList.length} intended file(s) — if a file silently dropped out, \`git add\` it and \`git commit --amend --no-edit\`, then re-check.
+6. git push -u origin ${BRANCH}
+7. gh pr create --base main --title ${JSON.stringify(commitTitle)} --body with: the triage counts (resolved ${totals.resolved ?? '?'} / config ${totals.configExtension ?? '?'} / code ${totals.codeCandidate ?? '?'} / unapprovable ${totals.unapprovable ?? '?'}), the matchers implemented, that the full test suite passed, and a line pointing at ${REPORT} (which is intentionally NOT committed).
+8. Return branch, commitSha, prUrl, and the exact stagedFiles list you committed.
 
 If push or PR creation fails (e.g. auth), still return branch + commitSha and put the error in "note".`,
   {
@@ -304,7 +353,7 @@ If push or PR creation fails (e.g. auth), still return branch + commitSha and pu
     schema: {
       type: 'object',
       additionalProperties: false,
-      required: ['branch'],
+      required: ['branch', 'stagedFiles'],
       properties: {
         branch: { type: 'string' },
         commitSha: { type: 'string' },
@@ -317,15 +366,21 @@ If push or PR creation fails (e.g. auth), still return branch + commitSha and pu
 );
 
 log(`Shipped on ${ship?.branch ?? BRANCH}${ship?.prUrl ? ` → ${ship.prUrl}` : ''}`);
+// Sanity-check: warn if the agent committed anything outside the intended set.
+const committed = ship?.stagedFiles ?? [];
+const unexpected = committed.filter((f) => !stageList.includes(f.replace(/^\.?\//, '')));
+if (unexpected.length > 0) log(`⚠️ Ship committed unexpected file(s): ${unexpected.join(', ')} — review the PR.`);
 
 return {
   branch: ship?.branch ?? BRANCH,
   prUrl: ship?.prUrl ?? null,
   commitSha: ship?.commitSha ?? null,
+  commitTitle,
   totals, configApplied,
   implemented: done.map((r) => ({ lead: r.lead, matcher: r.matcher, files: r.files, testsAdded: r.testsAdded })),
   skipped: implResults.filter((r) => r.status !== 'done').map((r) => ({ lead: r.lead, status: r.status, summary: r.summary })),
   verify, report: REPORT,
+  intendedStageList: stageList,
   stagedFiles: ship?.stagedFiles ?? [],
   note: ship?.note,
 };

@@ -1,3 +1,7 @@
 node_modules/
 dist/
 *.js.map
+
+# Scratch outputs from the refine-matchers workflow / triage script
+triage-report.md
+triage-result.json
