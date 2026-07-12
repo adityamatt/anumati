@@ -74,6 +74,12 @@ describe("parseAddArgs", () => {
     const o = parseAddArgs(["eslint"]);
     expect(o.allowWrite).toBeUndefined();
   });
+
+  it("parses --remotes and --protected-branches for git-push", () => {
+    const o = parseAddArgs(["git-push", "--remotes", "origin,upstream", "--protected-branches", "develop"]);
+    expect(o.remotes).toEqual(["origin", "upstream"]);
+    expect(o.protectedBranches).toEqual(["develop"]);
+  });
 });
 
 describe("applyAdd", () => {
