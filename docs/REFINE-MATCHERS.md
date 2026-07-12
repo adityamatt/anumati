@@ -78,15 +78,16 @@ unapprovable bucket.
 > Requires multi-agent orchestration (say **"use a workflow"** / ultracode).
 
 This script lives in the repo (`workflows/refine-matchers.js`), not in
-`.claude/`, so run it by **script path** rather than by name — ask Claude to:
+`.claude/`, so run it by **script path**. It takes **no arguments** — just ask:
 
 ```
-use a workflow: run workflows/refine-matchers.js with stamp 2026-07-11
+use a workflow: run workflows/refine-matchers.js
 ```
 
-(Claude invokes it via `Workflow({ scriptPath: "workflows/refine-matchers.js", args: { stamp: "…" } })`.)
-Pass today's date as `stamp` — it becomes the branch suffix, and `Date.now()`
-is unavailable inside workflow scripts. It runs six phases:
+(Claude invokes it via `Workflow({ scriptPath: "workflows/refine-matchers.js" })`.)
+The workflow derives everything itself, including a unique branch name
+(`anumati-triage/<YYYYMMDD-HHMMSS>`, stamped by the triage agent via `date`,
+since `Date.now()` is unavailable inside workflow scripts). It runs six phases:
 
 1. **Triage** — `npm run build`, run the script, load the JSON.
 2. **Config** — auto-apply every verified `anumati add …` to your live
@@ -102,21 +103,27 @@ is unavailable inside workflow scripts. It runs six phases:
    Anything that can't reach green is reverted.
 5. **Verify** — one authoritative `build` + `tsc --noEmit` + full `vitest run`.
    A red result **blocks the commit**.
-6. **Ship** — create branch `anumati-triage/<stamp>`, stage **only** the
-   matcher/test/doc files (never `git add -A`; the unrelated `package.json`
-   version bump is explicitly excluded), commit, push, and open a PR against
-   `main` with `gh`.
+6. **Ship** — create the branch, then stage **only** the exact files the
+   Implement phase reported touching. The script computes that list itself and
+   hands the agent explicit `git add <path>` commands — never `git add -A`. The
+   workflow's own files (`workflows/refine-matchers.js`, `scripts/triage-*.js`,
+   `docs/REFINE-MATCHERS.md`), the triage outputs, and `package.json` are on a
+   hard **`NEVER_STAGE`** denylist so the workflow can never commit itself or
+   unrelated edits. The commit title is built from the real implemented leads
+   (no placeholder). Then commit, push, and open a PR against `main` with `gh`.
 
-### Args
+### Args (all optional — the default is to run with none)
 
 | Arg | Default | Meaning |
 |---|---|---|
 | `repo` | this repo path | Repo root. |
 | `log` | `~/.claude/anumati-passthrough.jsonl` | Passthrough log. |
 | `config` | `~/.claude/permissions.json` | Live config to extend. |
-| `stamp` | `latest` | Branch suffix (`Date.now()` is unavailable in workflow scripts — pass a date). |
 | `applyConfig` | `true` | Auto-apply verified config extensions. |
 | `maxCandidates` | `12` | Cap on implementation units per run. |
+
+The branch name is not an arg — the triage agent stamps it with `date` so every
+run gets a unique `anumati-triage/<YYYYMMDD-HHMMSS>` branch.
 
 ### Safety properties
 
@@ -124,7 +131,11 @@ is unavailable inside workflow scripts. It runs six phases:
   runs the exact `anumati add` command, the single source of truth for writing
   config.
 - No code change is committed unless the **full suite is green**.
-- Commits are path-scoped; `git add -A` is never used.
+- Commits are path-scoped: the script computes the exact file list from the
+  Implement phase and issues explicit `git add <path>` commands. `git add -A` is
+  never used, and a `NEVER_STAGE` denylist keeps the workflow's own files, the
+  triage outputs, and `package.json` out of every commit — so a run can never
+  commit itself or unrelated working-tree edits.
 - The safety gate stands between "coverable" and "implemented" — destructive /
   network / write / watch / privileged shapes are dropped before any code is
   written.
