@@ -1,0 +1,67 @@
+name: Publish to npm
+
+# Publishes anumati to the npm registry from a dedicated CI runner (never a
+# laptop) with build provenance. This workflow is MANUAL ONLY — it runs when you
+# trigger it from the Actions tab (Actions → Publish to npm → Run workflow).
+# There is no automatic trigger; nothing publishes on push, tag, or release.
+#
+# Provenance (--provenance) records, in a signed Sigstore attestation, exactly
+# which workflow/commit produced the tarball. It requires:
+#   - the `id-token: write` permission below (OIDC token for Sigstore), and
+#   - a public repo + npm >= 9.5 (bundled with Node 20).
+#
+# The npm auth token is read from the NPM_TOKEN repo secret. Configure it under
+# Settings → Secrets and variables → Actions. Use an npm "Automation" token so
+# it bypasses 2FA in CI.
+#
+# NOTE: npm Trusted Publishing (OIDC) is the more secure alternative — it needs
+# no stored token at all. To switch: configure this repo+workflow as a trusted
+# publisher on npmjs.com, then drop the NODE_AUTH_TOKEN env below (the OIDC
+# token from `id-token: write` is used automatically). See
+# https://docs.npmjs.com/trusted-publishers
+
+on:
+  # Manual trigger only. Run from: Actions → Publish to npm → Run workflow.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build, test, pack — but do NOT publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance (Sigstore OIDC)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Dry run — pack only (no publish)
+        if: ${{ inputs.dry_run }}
+        run: npm pack --dry-run
+
+      - name: Publish to npm (with provenance)
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
