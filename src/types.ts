@@ -27,6 +27,19 @@ export interface Rule {
    */
   allowed_git_ops?: string[];
   /**
+   * Remotes the `git-push` matcher may push to (default ["origin"]). Only the
+   * bounded shape `git push [-u] <remote> <branch>` is ever allowed — force,
+   * delete, --all/--mirror/--tags, and protected-branch targets are always
+   * rejected regardless of this list.
+   */
+  allowed_remotes?: string[];
+  /**
+   * Branch names the `git-push` matcher must never push to. This is ADDITIVE
+   * with a built-in default set (main/master/release/production/prod) — a rule
+   * can extend it but never shrink the built-in protection.
+   */
+  protected_branches?: string[];
+  /**
    * Opt into the in-place-write forms of a formatter/linter matcher:
    * `eslint --fix`/`--fix-dry-run` and `prettier --write`/`-w`. Default false —
    * these rewrite source files, so they are blocked unless a rule sets this

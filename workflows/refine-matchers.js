@@ -156,7 +156,7 @@ if (APPLY_CONFIG && triage.configExtensionCount > 0) {
     `Apply anumati's VERIFIED config extensions to the live config. These were re-verified by anumati's real matcher, so they are safe by construction — do not second-guess them.
 
 1. Read ${JSON_OUT}. Take its "configExtensions" array; each entry has a "command" field (an \`anumati add …\` invocation).
-2. Run each command EXACTLY as written, from ${REPO}, one at a time. (anumati is on PATH via the repo; if \`anumati\` is not found, run it as \`node dist/index.js add …\` with the same args.)
+2. Run each command from ${REPO}, one at a time, but invoke it as \`node dist/index.js add …\` (replace the leading \`anumati\` with \`node dist/index.js\`, keeping all args identical). This form auto-approves via the node-script matcher, so the phase runs unattended; a bare \`anumati …\` would stall on a permission prompt.
 3. Re-run: node scripts/triage-passthrough.js --log "${LOG}" --config "${CONFIG}" --cwd "${REPO}" --out /tmp/triage-after.md --json /tmp/triage-after.json --quiet
 4. Read /tmp/triage-after.json and report totals.configExtension (should be ~0 now).
 
@@ -337,11 +337,11 @@ Run these steps in order:
 2. Stage EXACTLY these files and NO others — run each command verbatim:
    ${addCommands}
    Do NOT run \`git add -A\`, \`git add .\`, or \`git add\` on any other path. In particular do NOT stage: ${NEVER_STAGE.join(', ')}.
-3. Run \`git status --short\`. Verify that the staged set (lines starting with a staged-status letter in column 1) is EXACTLY these ${stageList.length} file(s): ${stageList.join(', ')}. If anything else is staged, unstage it with \`git restore --staged <path>\`. If any of the ${stageList.length} is missing from the index, \`git add\` it again.
+3. Run \`git status --short\`. Verify BEFORE committing that the staged set (lines whose column-1 status letter is set) is EXACTLY these ${stageList.length} file(s): ${stageList.join(', ')}. If anything else is staged, unstage it with \`git restore --staged <path>\`. If any of the ${stageList.length} is missing from the index, re-run its \`git add\`. Do not proceed until the staged set matches exactly — this pre-commit check is what prevents a dropped-file commit (do NOT rely on \`git commit --amend\` to fix it afterward; --amend is blocked and will stall the run).
 4. Commit with this exact title (use -m for the title, a second -m for the body):
    Title: ${JSON.stringify(commitTitle)}
    Body: list each matcher added/fixed (${done.map((r) => `${r.lead} → ${r.matcher ?? 'n/a'} (+${r.testsAdded ?? 0} tests)`).join('; ')}); note that verified config extensions were applied to the live config separately (not in this commit); note the full suite passed (${verify?.testsPassed ?? '?'} tests, 0 failures).
-5. Run \`git show --stat HEAD\` and confirm the commit contains exactly the ${stageList.length} intended file(s) — if a file silently dropped out, \`git add\` it and \`git commit --amend --no-edit\`, then re-check.
+5. Run \`git show --stat HEAD\` and confirm the commit contains exactly the ${stageList.length} intended file(s). If a file is missing: \`git reset --soft HEAD~1\` (undo the commit, keep changes staged), \`git add\` the missing file, and commit again with the same title/body. (Avoid \`git commit --amend\` — it is blocked.)
 6. git push -u origin ${BRANCH}
 7. gh pr create --base main --title ${JSON.stringify(commitTitle)} --body with: the triage counts (resolved ${totals.resolved ?? '?'} / config ${totals.configExtension ?? '?'} / code ${totals.codeCandidate ?? '?'} / unapprovable ${totals.unapprovable ?? '?'}), the matchers implemented, that the full test suite passed, and a line pointing at ${REPORT} (which is intentionally NOT committed).
 8. Return branch, commitSha, prUrl, and the exact stagedFiles list you committed.

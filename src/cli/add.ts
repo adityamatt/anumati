@@ -13,6 +13,8 @@ export interface AddOptions {
   repos?: string[];
   paths?: string[];
   gitOps?: string[];
+  remotes?: string[];
+  protectedBranches?: string[];
   allowWrite?: boolean;
   config?: string;
 }
@@ -71,6 +73,8 @@ export function applyAdd(opts: AddOptions): AddResult {
   if (opts.scripts) mergeArray(r, "allowed_scripts", opts.scripts);
   if (opts.repos) mergeArray(r, "allowed_repos", opts.repos);
   if (opts.gitOps) mergeArray(r, "allowed_git_ops", opts.gitOps);
+  if (opts.remotes) mergeArray(r, "allowed_remotes", opts.remotes);
+  if (opts.protectedBranches) mergeArray(r, "protected_branches", opts.protectedBranches);
   if (opts.allowWrite) r.allow_write = true;
   if (opts.paths) {
     if (!rule.open) rule.open = { allowed_paths: [] };
@@ -96,6 +100,8 @@ const LIST_FLAGS: Record<string, keyof AddOptions> = {
   "--repos": "repos",
   "--paths": "paths",
   "--git-ops": "gitOps",
+  "--remotes": "remotes",
+  "--protected-branches": "protectedBranches",
 };
 
 // A flag's value must exist and not itself be another flag.
@@ -141,7 +147,7 @@ export function runAdd(argv: string[]): void {
   const matcher = args[0];
   if (!matcher || matcher.startsWith("--")) {
     console.error(
-      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--modules X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--git-ops X,Y] [--allow-write] [--config /path]",
+      "Usage: anumati add <matcher> [--domain X] [--imports X,Y] [--modules X,Y] [--packages X] [--scripts X] [--repos X] [--paths X] [--git-ops X,Y] [--remotes X,Y] [--protected-branches X,Y] [--allow-write] [--config /path]",
     );
     process.exit(1);
   }
