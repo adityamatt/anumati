@@ -16,6 +16,7 @@ const READ_ONLY_SUBCOMMANDS: Record<string, Set<string>> = {
     "get-log-events",
     "get-log-record",
     "get-query-results",
+    "start-query",
     "describe-queries",
     "describe-metric-filters",
     "describe-subscription-filters",
@@ -192,6 +193,36 @@ const READ_ONLY_SUBCOMMANDS: Record<string, Set<string>> = {
     "get-template",
     "get-template-summary",
     "get-stack-policy",
+  ]),
+  // CloudWatch reads only. list-*/get-*/describe-* read metric, dashboard, and
+  // alarm metadata plus metric data. Excluded: put-metric-data/put-metric-alarm/
+  // put-dashboard/put-* (write metrics/alarms/dashboards), delete-* (remove them),
+  // set-alarm-state (fakes an alarm transition), and enable/disable-alarm-actions
+  // (change alarm behavior).
+  cloudwatch: new Set([
+    "list-metrics",
+    "get-dashboard",
+    "list-dashboards",
+    "describe-alarms",
+    "get-metric-data",
+    "get-metric-statistics",
+  ]),
+  // `aws account`. Region introspection + contact info reads only. Excluded:
+  // enable-region/disable-region (opt regions in/out), put-*/delete-* for
+  // alternate-contact and contact-information (write account settings).
+  account: new Set([
+    "list-regions",
+    "get-region-opt-status",
+    "get-contact-information",
+  ]),
+  // `aws configure`. Reads of the local config/credentials only — `get` prints a
+  // single value, `list`/`list-profiles` enumerate settings/profiles. Excluded:
+  // set (writes a config value), import (writes credentials), and add-model
+  // (writes a service model file) — all mutate local files.
+  configure: new Set([
+    "get",
+    "list-profiles",
+    "list",
   ]),
 };
 
