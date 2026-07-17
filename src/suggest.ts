@@ -25,6 +25,7 @@ import { matchSafeInspect } from "./matchers/safe-inspect.js";
 import { matchNpxTsc } from "./matchers/npx-tsc.js";
 import { matchEslint } from "./matchers/eslint.js";
 import { matchPrettier } from "./matchers/prettier.js";
+import { matchNodeScript } from "./matchers/node-script.js";
 
 export interface Suggestion {
   /** The anumati CLI command to run to apply this suggestion */
@@ -293,6 +294,22 @@ function suggestNewRule(
       cmd,
     );
   }
+  // node-script: `node <local script>` trusted by location. Suggest the
+  // script's parent directory as the allowed root, then verify. (git-push and
+  // gh-pr are intentionally NOT auto-suggested — enabling network writes should
+  // be a deliberate `anumati add`, not a nudge on every push/pr passthrough.)
+  if (!has("node-script")) {
+    const dir = nodeScriptDir(cmd, cwd);
+    if (dir && matchNodeScript(cmd, cwd, [dir])) {
+      return {
+        command: `anumati add node-script --paths ${dir}`,
+        description: `Auto-approve running trusted node scripts under ${dir}`,
+        matcher: "node-script",
+        configDelta: { open: { allowed_paths: [dir] } },
+        trigger: cmd,
+      };
+    }
+  }
   // safe-inspect is the broadest matcher — try it last so more specific
   // families (git-read, cargo, go) win when they also apply.
   if (!has("safe-inspect") && matchSafeInspect(cmd)) {
@@ -426,6 +443,21 @@ function noParamSuggestion(
 
 function unique(items: string[]): string[] {
   return [...new Set(items)];
+}
+
+// For a `node <script> …` command, the directory the script resolves into —
+// the broadest useful allowed root to suggest. Returns null if the command is
+// not a node-script invocation. The matcher re-verifies, so this stays loose.
+function nodeScriptDir(cmd: string, cwd: string): string | null {
+  const segments = parseCompound(cmd);
+  if (!segments) return null;
+  const argv = tokenize(segments[0].raw);
+  if (!argv || basename(argv[0]) !== "node") return null;
+  const scriptArg = argv[1];
+  if (!scriptArg || scriptArg.startsWith("-")) return null;
+  const abs = scriptArg.startsWith("/") ? scriptArg : resolve(cwd, scriptArg);
+  const dir = dirname(abs);
+  return dir.endsWith(sep) ? dir : dir + sep;
 }
 
 function httpsHostname(token: string): string | null {

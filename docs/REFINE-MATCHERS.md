@@ -125,6 +125,35 @@ since `Date.now()` is unavailable inside workflow scripts). It runs six phases:
 The branch name is not an arg — the triage agent stamps it with `date` so every
 run gets a unique `anumati-triage/<YYYYMMDD-HHMMSS>` branch.
 
+### Running fully unattended
+
+The workflow issues shell commands through the anumati hook like any other
+session, so it only runs start-to-finish without prompts if those commands are
+auto-approved. Three matchers exist for exactly the commands this workflow runs
+that anumati otherwise (correctly) blocks — enable them once and every phase is
+silent:
+
+```bash
+node dist/index.js add node-script --paths /Users/<you>/<code-root>/   # run trusted repo scripts (triage script, node dist/index.js add …)
+node dist/index.js add git-push --remotes origin                       # push a NEW branch to origin (force / protected-branch / delete all blocked)
+node dist/index.js add gh-pr                                           # gh pr create/edit/comment (merge / close blocked)
+```
+
+These are real network-write carve-outs applied **globally**, so weigh them:
+- `git-push` allows only `git push [-u] origin <branch>` to a non-protected
+  branch — never `--force`, `--delete`, `--all/--mirror/--tags`, or a push to
+  `main`/`master`/`release`/`production`/`prod`.
+- `gh-pr` allows only the non-destructive `gh pr` subcommands — never `merge`,
+  `close`, `reopen`, `review`.
+- `node-script` trusts a script **by location** (inside an allowed root), so
+  scope `--paths` to your code root, not `/`.
+
+Two commands stay a manual prompt by design and are NOT part of the happy path:
+bare `anumati add …` (the workflow uses `node dist/index.js add …` instead,
+which `node-script` approves) and `git commit --amend` (history-rewriting — the
+Ship phase avoids it, using a pre-commit staging check plus a `reset --soft`
+redo only as a rare fallback).
+
 ### Safety properties
 
 - Config extensions are only ever those anumati itself verified — the workflow
