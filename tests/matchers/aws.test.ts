@@ -241,6 +241,110 @@ describe("matchAws — cloudformation (block writes)", () => {
   });
 });
 
+describe("matchAws — logs start-query (allow read-only query dispatch)", () => {
+  it("start-query with --output text", () => {
+    expect(
+      matchAws(
+        `aws logs start-query --profile drashta-prod --region eu-central-1 --log-group-name "/aws/lambda/DrashtaProdAppStack-TieredProcessorSmallHandlerA33-uVw6AyovyDmX" --start-time 1784181612 --end-time 1784192412 --query-string 'fields @timestamp, @message | filter @message like /out of memory/ | sort @timestamp desc | limit 50' --output text`,
+      ),
+    ).toBe(true);
+  });
+  // The real invocations use `\`-newline line continuations; parseCompound treats
+  // the newline like `;`, so the multi-line whole-command shape stays rejected —
+  // only the single-line coverable shape is approved.
+  it("multi-line \\-continuation form stays rejected", () => {
+    expect(
+      matchAws(
+        `aws logs start-query --profile drashta-prod --region eu-central-1 \\\n  --log-group-name "/aws/lambda/x" \\\n  --start-time 1784181612 --end-time 1784192412 \\\n  --query-string 'fields @timestamp, @message' \\\n  --output text`,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("matchAws — cloudwatch (allow read-only)", () => {
+  it("list-metrics", () => {
+    expect(
+      matchAws(
+        `aws cloudwatch list-metrics --profile drashta-prod --region eu-central-1 --namespace Kizil --dimensions Name=File,Value=path_actual_cpt --output json`,
+      ),
+    ).toBe(true);
+  });
+  it("get-dashboard with --output json", () => {
+    expect(
+      matchAws(
+        `aws cloudwatch get-dashboard --profile drashta-prod --region eu-central-1 --dashboard-name "Kizil--prod--path_actual_cpt" --output json`,
+      ),
+    ).toBe(true);
+  });
+  it("get-dashboard | head", () => {
+    expect(
+      matchAws(
+        `aws cloudwatch get-dashboard --dashboard-name "Kizil--prod--path_actual_cpt" --output json | head`,
+      ),
+    ).toBe(true);
+  });
+  it("describe-alarms", () => expect(matchAws("aws cloudwatch describe-alarms")).toBe(true));
+  it("get-metric-data", () => expect(matchAws("aws cloudwatch get-metric-data --metric-data-queries '[]' --start-time 1 --end-time 2")).toBe(true));
+  it("get-metric-statistics", () => expect(matchAws("aws cloudwatch get-metric-statistics --namespace n --metric-name m --start-time 1 --end-time 2 --period 60 --statistics Sum")).toBe(true));
+  it("list-dashboards", () => expect(matchAws("aws cloudwatch list-dashboards")).toBe(true));
+});
+
+describe("matchAws — cloudwatch (block writes / alarm mutations)", () => {
+  it("put-metric-data", () => expect(matchAws("aws cloudwatch put-metric-data --namespace n --metric-data '[]'")).toBe(false));
+  it("put-metric-alarm", () => expect(matchAws("aws cloudwatch put-metric-alarm --alarm-name a")).toBe(false));
+  it("put-dashboard", () => expect(matchAws("aws cloudwatch put-dashboard --dashboard-name d --dashboard-body '{}'")).toBe(false));
+  it("delete-alarms", () => expect(matchAws("aws cloudwatch delete-alarms --alarm-names a")).toBe(false));
+  it("delete-dashboards", () => expect(matchAws("aws cloudwatch delete-dashboards --dashboard-names d")).toBe(false));
+  it("set-alarm-state", () => expect(matchAws("aws cloudwatch set-alarm-state --alarm-name a --state-value ALARM --state-reason r")).toBe(false));
+  it("enable-alarm-actions", () => expect(matchAws("aws cloudwatch enable-alarm-actions --alarm-names a")).toBe(false));
+  it("get-dashboard | python3 (unsafe pipe consumer) stays rejected", () => {
+    expect(
+      matchAws(
+        `aws cloudwatch get-dashboard --profile drashta-prod --region eu-central-1 --dashboard-name "Kizil--prod--path_actual_cpt" --output json 2>&1 | python3 -c "import sys,json; d=json.load(sys.stdin); print(d)"`,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("matchAws — account (allow region/contact reads)", () => {
+  it("list-regions with query/output flags", () => {
+    expect(
+      matchAws(
+        `aws account list-regions --profile drashta-prod --region-opt-status-contains ENABLED ENABLED_BY_DEFAULT --query 'Regions[].RegionName' --output text`,
+      ),
+    ).toBe(true);
+  });
+  it("list-regions | head", () => {
+    expect(
+      matchAws(
+        `aws account list-regions --profile drashta-prod --region-opt-status-contains ENABLED ENABLED_BY_DEFAULT --query 'Regions[].RegionName' --output text 2>&1 | head`,
+      ),
+    ).toBe(true);
+  });
+  it("get-region-opt-status", () => expect(matchAws("aws account get-region-opt-status --region-name ap-south-1")).toBe(true));
+  it("get-contact-information", () => expect(matchAws("aws account get-contact-information")).toBe(true));
+});
+
+describe("matchAws — account (block region opt-in/out & contact writes)", () => {
+  it("enable-region", () => expect(matchAws("aws account enable-region --region-name ap-south-1")).toBe(false));
+  it("disable-region", () => expect(matchAws("aws account disable-region --region-name ap-south-1")).toBe(false));
+  it("put-contact-information", () => expect(matchAws("aws account put-contact-information --contact-information '{}'")).toBe(false));
+  it("put-alternate-contact", () => expect(matchAws("aws account put-alternate-contact --alternate-contact-type BILLING")).toBe(false));
+  it("delete-alternate-contact", () => expect(matchAws("aws account delete-alternate-contact --alternate-contact-type BILLING")).toBe(false));
+});
+
+describe("matchAws — configure (allow local config reads)", () => {
+  it("list-profiles", () => expect(matchAws("aws configure list-profiles")).toBe(true));
+  it("get region --profile", () => expect(matchAws("aws configure get region --profile drashta-prod")).toBe(true));
+  it("list", () => expect(matchAws("aws configure list")).toBe(true));
+});
+
+describe("matchAws — configure (block local config writes)", () => {
+  it("set (writes a config value)", () => expect(matchAws("aws configure set region us-east-1")).toBe(false));
+  it("import (writes credentials)", () => expect(matchAws("aws configure import --csv file://keys.csv")).toBe(false));
+  it("add-model (writes a service model file)", () => expect(matchAws("aws configure add-model --service-model file://model.json")).toBe(false));
+});
+
 describe("matchAws — block out-of-scope services", () => {
   it("ec2 describe-instances is rejected (service not allowlisted)", () => {
     expect(matchAws("aws ec2 describe-instances")).toBe(false);
