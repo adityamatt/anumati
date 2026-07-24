@@ -48,4 +48,6 @@ describe("matchGitPush — block (shape)", () => {
   it("chained && is not a single command", () => expect(matchGitPush("git push origin x && rm y")).toBe(false));
   it("file redirection", () => expect(matchGitPush("git push origin feature-x > out.txt")).toBe(false));
   it("empty", () => expect(matchGitPush("")).toBe(false));
+  it("empty allowed_remotes is inert (opt-in placeholder)", () =>
+    expect(matchGitPush("git push origin feature-x", [])).toBe(false));
 });

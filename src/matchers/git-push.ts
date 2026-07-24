@@ -19,7 +19,9 @@ import { hasUnsafeRedirection } from "../parser/redirect.js";
 // Chaining is handled by evaluate() composition, so this matcher only ever sees
 // a single command.
 
-// Remotes a push may target. A bare rule defaults to origin only.
+// Remotes a push may target. Used only as the default for direct callers that
+// omit the argument; a rule must name at least one remote to enable pushes —
+// an empty `allowed_remotes` (e.g. the placeholder `init` seeds) is inert.
 const DEFAULT_REMOTES = ["origin"];
 
 // Branch names that must never be an auto-approved push target. A bare rule
@@ -94,7 +96,11 @@ export function matchGitPush(
   // Single command only; chaining is evaluate()'s job.
   if (segments.length !== 1 || segments[0].operator !== null) return false;
 
-  const effectiveRemotes = remotes.length > 0 ? remotes : DEFAULT_REMOTES;
+  // No allowed remote → the rule is a disabled placeholder (opt in with
+  // `anumati add git-push --remotes origin`). Fail closed rather than falling
+  // back to a default, so an empty-array rule never silently approves a push.
+  if (remotes.length === 0) return false;
+  const effectiveRemotes = remotes;
   // Protected list is ADDITIVE with the defaults — a rule can add names but
   // never shrink the built-in protection of main/master/….
   const effectiveProtected = [...new Set([...DEFAULT_PROTECTED, ...protectedBranches])];
