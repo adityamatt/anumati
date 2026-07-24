@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "fs";
+import { readFileSync, readSync } from "fs";
 import { join } from "path";
 import { evaluate } from "./matcher.js";
 import { audit } from "./audit.js";
@@ -30,8 +30,28 @@ import type {
   SuggestConfig,
 } from "./types.js";
 
+// Read all of stdin synchronously from fd 0. We read the descriptor directly
+// rather than the "/dev/stdin" path: opening that path for a pipe is unreliable
+// on Linux (the read can come back empty), whereas fd 0 is the descriptor
+// Claude Code (and spawnSync's `input`) already piped the JSON into. Chunks are
+// accumulated until EOF, and a transient EAGAIN (non-blocking pipe with no data
+// yet) is retried rather than treated as end-of-input.
 function readStdin(): string {
-  return readFileSync("/dev/stdin", "utf-8");
+  const chunks: Buffer[] = [];
+  const buf = Buffer.alloc(65536);
+  while (true) {
+    let bytes: number;
+    try {
+      bytes = readSync(0, buf, 0, buf.length, null);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EAGAIN") continue;
+      if ((err as NodeJS.ErrnoException).code === "EOF") break;
+      throw err;
+    }
+    if (bytes === 0) break;
+    chunks.push(Buffer.from(buf.subarray(0, bytes)));
+  }
+  return Buffer.concat(chunks).toString("utf-8");
 }
 
 function resolveRootConfigPath(): string {
