@@ -345,4 +345,20 @@ describe("starter config — functional", () => {
     // Comma-hidden blocked module must not slip through the seeded json import.
     expect(evaluate(bash(`python3 -c "import json, subprocess"`), rules).decision).toBeNull();
   });
+
+  it("seeds the parameterized matchers as inert placeholders (present but approving nothing)", () => {
+    applyInit({ config: configPath });
+    const rules = read().allow!;
+    // Each placeholder ships in the config for discoverability...
+    for (const m of ["curl", "gh", "pip3-install", "git-write", "git-push", "node-script"]) {
+      expect(rules.some((r) => r.matcher === m), m).toBe(true);
+    }
+    // ...but an empty allowlist approves nothing until the user fills it in.
+    expect(evaluate(bash("curl https://example.com"), rules).decision).toBeNull();
+    expect(evaluate(bash("gh api repos/octocat/hello/issues"), rules).decision).toBeNull();
+    expect(evaluate(bash("pip install requests"), rules).decision).toBeNull();
+    expect(evaluate(bash("git commit -m x"), rules).decision).toBeNull();
+    expect(evaluate(bash("git push origin feature-x"), rules).decision).toBeNull();
+    expect(evaluate(bash("node scripts/triage.js"), rules).decision).toBeNull();
+  });
 });

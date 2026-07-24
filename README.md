@@ -91,7 +91,11 @@ It prompts for **project** (this folder) or **root** (global) scope, then:
 1. **Writes a starter config** of broadly-useful, low-risk rules — read-only
    inspection, git reads, `cd`/`sleep`/`echo`/`sed`/`jq`, `npx tsc`, `cargo`,
    `go`, test runners (`vitest`/`pytest`/`jest`), and pure-compute
-   `python3`/`node`. Enough to be useful immediately.
+   `python3`/`node`. Enough to be useful immediately. It also seeds the
+   parameterized matchers (`curl`, `gh`, `pip3-install`, `git-write`,
+   `git-push`, `node-script`) as **inert placeholders** — empty allowlists that
+   approve nothing until you fill them in, so you can see the matcher exists and
+   which key to populate (`anumati add <matcher> …`) without hunting the docs.
 2. **Scaffolds an audit log** next to the config.
 3. **Registers the PreToolUse hook** in the sibling `settings.json` (merged
    non-destructively into any existing hooks).

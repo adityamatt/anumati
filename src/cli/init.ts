@@ -16,21 +16,34 @@ import {
 } from "./settings.js";
 import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
 
-// Starter rules a fresh user gets for immediate value without hand-writing any
-// allowlists. Two tiers, both broadly useful for day-to-day development:
+// Starter rules a fresh user gets. Two kinds of entry:
+//
+//   ACTIVE (auto-approve out of the box) — broadly useful, low-risk:
 //   - read-only / no-op / lint: safe-inspect, git-read, cd, sleep, echo, sed,
 //     jq, npx-tsc, cargo, go — no side effects (or idempotent formatting).
 //   - build/test runners: vitest, test-runner, npm-script — these EXECUTE the
 //     project's own code, the same trust already implied by working in the repo.
-// Deliberately omitted (opt in via `anumati add`): parameterized matchers that
-// are useless empty (curl needs domains, gh needs repos, pip3-install needs
-// packages) and git-write (mutates the repo — enable explicit ops when wanted).
-// The python3-pipe / nodejs-pipe rules are seeded with curated side-effect-free
-// module sets; any open()/file-path require() is still path-checked separately.
+//   The python3-pipe / nodejs-pipe rules are seeded with curated side-effect-free
+//   module sets; any open()/file-path require() is still path-checked separately.
+//
+//   PLACEHOLDER (present but inert — parameterized matchers seeded with empty
+//   arrays): curl, gh, pip3-install, git-write, git-push, node-script. An empty
+//   allowlist matches nothing, so these approve NOTHING until a user fills them
+//   in (`anumati add <matcher> …`). They ship in the config purely for
+//   DISCOVERABILITY — so a user reading their config sees the matcher exists and
+//   which key to populate, instead of having to know it from the docs. Every one
+//   of these six is a no-op while empty: curl/gh/pip3-install/git-write already
+//   fail closed on an empty list, and git-push/node-script are gated the same way
+//   (an empty allowed_remotes / open.allowed_paths never falls back to a default).
 export const STARTER_RULES: Rule[] = [
   { tool: "Bash", matcher: "safe-inspect", desc: "Read-only inspection (ls/cat/grep/find/…)" },
   { tool: "Bash", matcher: "git-read", desc: "Read-only git (status/log/diff/…)" },
-  { tool: "Bash", matcher: "cd", desc: "cd into the working directory or a subfolder" },
+  {
+    tool: "Bash",
+    matcher: "cd",
+    open: { allowed_paths: [] },
+    desc: "cd into the working directory or a subfolder (add open.allowed_paths for extra roots, e.g. a sibling repo)",
+  },
   { tool: "Bash", matcher: "sleep", desc: "Pause execution (sleep <seconds>)" },
   { tool: "Bash", matcher: "echo", desc: "Print to stdout (progress/section markers)" },
   { tool: "Bash", matcher: "sed", desc: "Read-only sed (print/delete/quit; -i/write blocked)" },
@@ -60,6 +73,44 @@ export const STARTER_RULES: Rule[] = [
     matcher: "nodejs-pipe",
     allowed_modules: [...KNOWN_SAFE_MODULES],
     desc: "node using pure-compute built-in modules (no fs/network/child_process)",
+  },
+  // Inert placeholders — seeded empty for discoverability. Fill the named key
+  // (via `anumati add …`) to enable; each approves nothing until you do.
+  {
+    tool: "Bash",
+    matcher: "curl",
+    allowed_domains: [],
+    desc: "PLACEHOLDER — add allowed_domains to allow curl to specific hosts",
+  },
+  {
+    tool: "Bash",
+    matcher: "gh",
+    allowed_repos: [],
+    desc: "PLACEHOLDER — add allowed_repos to allow read-only `gh api repos/<owner/repo>/…`",
+  },
+  {
+    tool: "Bash",
+    matcher: "pip3-install",
+    allowed_packages: [],
+    desc: "PLACEHOLDER — add allowed_packages to allow `pip install <pkg>` (\"*\" = any)",
+  },
+  {
+    tool: "Bash",
+    matcher: "git-write",
+    allowed_git_ops: [],
+    desc: "PLACEHOLDER — add allowed_git_ops (add/commit/branch/…); network + destructive ops always blocked",
+  },
+  {
+    tool: "Bash",
+    matcher: "git-push",
+    allowed_remotes: [],
+    desc: "PLACEHOLDER — add allowed_remotes to allow `git push [-u] <remote> <branch>`; force/protected/delete always blocked",
+  },
+  {
+    tool: "Bash",
+    matcher: "node-script",
+    open: { allowed_paths: [] },
+    desc: "PLACEHOLDER — add open.allowed_paths (a code root) to allow running trusted repo scripts by location",
   },
 ];
 

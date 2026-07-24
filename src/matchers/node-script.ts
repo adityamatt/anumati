@@ -54,7 +54,11 @@ function isNodeScriptSegment(raw: string, roots: string[]): boolean {
 }
 
 export function matchNodeScript(command: string, cwd: string = "", allowedPaths: string[] = []): boolean {
-  if (allowedPaths.length === 0 && !cwd) return false;
+  // No configured root → the rule is a disabled placeholder (opt in with
+  // `anumati add node-script --paths <code-root>`). Fail closed rather than
+  // trusting the cwd alone, so an empty-array rule never silently approves a
+  // repo-local script. Once a path IS configured, cwd is still a bonus root.
+  if (allowedPaths.length === 0) return false;
 
   const segments = parseCompound(command);
   if (!segments) return false;
