@@ -13,16 +13,31 @@ export const meta = {
 
 // ── Inputs (all optional; args overrides defaults) ────────────────────────────
 // This workflow is designed to be run with NO args — just "run the refine
-// workflow". Everything it needs it derives itself (the branch stamp comes from
-// the triage agent, which has shell access; Date.now() is unavailable here).
-const REPO = args?.repo ?? '/Users/you/you/open-source/anumati';
-const LOG = args?.log ?? '/Users/you/.claude/anumati-passthrough.jsonl';
-const CONFIG = args?.config ?? '/Users/you/.claude/permissions.json';
+// workflow". Everything it needs it derives itself. Because workflow scripts
+// have no Node API access (no process.cwd()/os.homedir(); Date.now() is also
+// unavailable), the two machine-specific paths are discovered by the Triage
+// agent, which DOES have shell access:
+//   • REPO  — the agent runs `git rev-parse --show-toplevel` in its cwd.
+//   • LOG / CONFIG — left unset so the triage script uses its own ~/.claude
+//     defaults (homedir-relative), which are correct on any machine.
+// Anyone forking this repo can therefore run it with no args and no editing.
+const ARG_REPO = args?.repo ?? null; // override only if the workflow isn't launched from the repo
+const LOG = args?.log ?? null; // null → triage script's ~/.claude default
+const CONFIG = args?.config ?? null; // null → triage script's ~/.claude default
 const APPLY_CONFIG = args?.applyConfig ?? true; // auto-apply verified config extensions
 const MAX_CANDIDATES = args?.maxCandidates ?? 12; // cap implementation units per run
 
-const REPORT = `${REPO}/triage-report.md`;
-const JSON_OUT = `${REPO}/triage-result.json`;
+// Scratch outputs, written into the repo root by the triage script. Resolved to
+// absolute paths (`${REPO}/…`) once the Triage agent reports the repo root.
+const REPORT_NAME = 'triage-report.md';
+const JSON_NAME = 'triage-result.json';
+let REPO; // set from the Triage agent's discovered repo root
+let REPORT; // `${REPO}/${REPORT_NAME}`
+let JSON_OUT; // `${REPO}/${JSON_NAME}` — the on-disk candidate data downstream agents read
+
+// Optional flag strings: passed through only when the caller supplied an override.
+const LOG_FLAG = LOG ? `--log ${JSON.stringify(LOG)}` : '';
+const CONFIG_FLAG = CONFIG ? `--config ${JSON.stringify(CONFIG)}` : '';
 
 // Files the workflow itself owns — the triage script, this workflow, its doc,
 // and its scratch outputs. These must NEVER be staged by the Ship phase; only
@@ -50,10 +65,14 @@ const NEVER_STAGE = [
 const TRIAGE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['ok', 'stamp', 'totals', 'configExtensionCount', 'codeCandidateLeads'],
+  required: ['ok', 'repoRoot', 'stamp', 'totals', 'configExtensionCount', 'codeCandidateLeads'],
   properties: {
     ok: { type: 'boolean' },
     error: { type: 'string' },
+    // Absolute repo root, from `git rev-parse --show-toplevel`. The workflow
+    // sandbox can't call process.cwd(), so the agent discovers it and every
+    // downstream path (scratch JSON, staging) is resolved against this.
+    repoRoot: { type: 'string' },
     // Branch-name stamp: output of `date +%Y%m%d-%H%M%S` run by the agent, so
     // each run gets a unique branch without relying on Date.now() (unavailable
     // in workflow scripts) or a caller-supplied arg.
@@ -120,14 +139,21 @@ const LOOKUP = (lead) =>
 phase('Triage');
 log('Building anumati and running deterministic triage over the passthrough log…');
 
+// The agent discovers the repo root itself (git rev-parse), then runs the
+// triage script from there. When the caller passed --repo, prefer that.
+const repoHint = ARG_REPO
+  ? `The repo root is ${ARG_REPO} — cd there first and use it as the root.`
+  : `Discover the repo root by running \`git rev-parse --show-toplevel\` in your cwd; use that path as the root for every step below and return it as "repoRoot".`;
+
 const triage = await agent(
-  `Run a deterministic triage step in the repo ${REPO}. Do EXACTLY this and nothing else:
+  `Run a deterministic triage step for the anumati repo. ${repoHint} Do EXACTLY this and nothing else:
 
 1. Run: date +%Y%m%d-%H%M%S    — capture its output verbatim as the "stamp".
-2. Run: npm run build            (cwd ${REPO})
-3. Run: node scripts/triage-passthrough.js --log "${LOG}" --config "${CONFIG}" --cwd "${REPO}" --out "${REPORT}" --json "${JSON_OUT}"
-4. Read ${JSON_OUT}. It has { totals, configExtensions[], codeCandidates[] }.
-5. Return ONLY: ok=true, stamp (from step 1), the totals object, configExtensionCount = configExtensions.length, and codeCandidateLeads = the "lead" field of each entry in codeCandidates IN ORDER (do not reorder, do not include any other candidate detail — downstream steps read the file themselves).
+2. From the repo root, run: npm run build
+3. From the repo root, run: node scripts/triage-passthrough.js ${LOG_FLAG} ${CONFIG_FLAG} --cwd "<repoRoot>" --out "<repoRoot>/${REPORT_NAME}" --json "<repoRoot>/${JSON_NAME}"
+   (substitute the actual repo-root path for <repoRoot>. Omit --log/--config when not shown above so the script uses its own ~/.claude defaults.)
+4. Read <repoRoot>/${JSON_NAME}. It has { totals, configExtensions[], codeCandidates[] }.
+5. Return ONLY: ok=true, repoRoot (absolute path), stamp (from step 1), the totals object, configExtensionCount = configExtensions.length, and codeCandidateLeads = the "lead" field of each entry in codeCandidates IN ORDER (do not reorder, do not include any other candidate detail — downstream steps read the file themselves).
 
 Do NOT analyze safety, do NOT edit source, do NOT summarize the examples. If build or the script fails, return ok=false with the error text.`,
   { label: 'triage:run', phase: 'Triage', schema: TRIAGE_SCHEMA },
@@ -137,6 +163,16 @@ if (!triage || !triage.ok) {
   log(`Triage failed: ${triage?.error ?? 'no result'}. Aborting.`);
   return { aborted: true, reason: triage?.error ?? 'triage produced no result' };
 }
+
+// Resolve every repo-relative path from the discovered root.
+REPO = ARG_REPO ?? triage.repoRoot;
+if (!REPO) {
+  log('Triage did not report a repo root. Aborting.');
+  return { aborted: true, reason: 'no repo root discovered' };
+}
+REPORT = `${REPO}/${REPORT_NAME}`;
+JSON_OUT = `${REPO}/${JSON_NAME}`;
+log(`Repo root: ${REPO}`);
 
 const STAMP = (triage.stamp && /^[0-9-]+$/.test(triage.stamp)) ? triage.stamp : 'latest';
 const BRANCH = `anumati-triage/${STAMP}`;
@@ -151,13 +187,13 @@ log(`Config extensions: ${triage.configExtensionCount} · code candidates to rev
 phase('Config');
 let configApplied = [];
 if (APPLY_CONFIG && triage.configExtensionCount > 0) {
-  log(`Applying ${triage.configExtensionCount} verified config extension(s) to ${CONFIG}…`);
+  log(`Applying ${triage.configExtensionCount} verified config extension(s) to ${CONFIG ?? 'the live ~/.claude config'}…`);
   const applier = await agent(
     `Apply anumati's VERIFIED config extensions to the live config. These were re-verified by anumati's real matcher, so they are safe by construction — do not second-guess them.
 
 1. Read ${JSON_OUT}. Take its "configExtensions" array; each entry has a "command" field (an \`anumati add …\` invocation).
 2. Run each command from ${REPO}, one at a time, but invoke it as \`node dist/index.js add …\` (replace the leading \`anumati\` with \`node dist/index.js\`, keeping all args identical). This form auto-approves via the node-script matcher, so the phase runs unattended; a bare \`anumati …\` would stall on a permission prompt.
-3. Re-run: node scripts/triage-passthrough.js --log "${LOG}" --config "${CONFIG}" --cwd "${REPO}" --out /tmp/triage-after.md --json /tmp/triage-after.json --quiet
+3. Re-run: node scripts/triage-passthrough.js ${LOG_FLAG} ${CONFIG_FLAG} --cwd "${REPO}" --out /tmp/triage-after.md --json /tmp/triage-after.json --quiet
 4. Read /tmp/triage-after.json and report totals.configExtension (should be ~0 now).
 
 Return the exact list of commands you ran and the remaining config-extension count.`,

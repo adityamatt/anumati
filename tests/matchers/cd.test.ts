@@ -65,13 +65,13 @@ describe("matchCd — block", () => {
 });
 
 describe("matchCd — allowed_paths (configured roots)", () => {
-  const EXTRA = ["/Users/you/repos/myapp"];
+  const EXTRA = ["/Users/you/repos/my-monorepo"];
 
   it("cd into a configured root itself", () =>
-    expect(matchCd("cd /Users/you/repos/myapp", CWD, EXTRA)).toBe(true));
+    expect(matchCd("cd /Users/you/repos/my-monorepo", CWD, EXTRA)).toBe(true));
 
   it("cd into a subfolder of a configured root", () =>
-    expect(matchCd("cd /Users/you/repos/myapp/src/my-package", CWD, EXTRA)).toBe(true));
+    expect(matchCd("cd /Users/you/repos/my-monorepo/src/my-package", CWD, EXTRA)).toBe(true));
 
   it("cwd still works when allowed_paths is set", () =>
     expect(matchCd("cd /Users/you/project/src", CWD, EXTRA)).toBe(true));
@@ -80,10 +80,10 @@ describe("matchCd — allowed_paths (configured roots)", () => {
     expect(matchCd("cd /etc", CWD, EXTRA)).toBe(false));
 
   it("still blocks a prefix-sibling of a configured root", () =>
-    expect(matchCd("cd /Users/you/repos/myapp-evil", CWD, EXTRA)).toBe(false));
+    expect(matchCd("cd /Users/you/repos/my-monorepo-evil", CWD, EXTRA)).toBe(false));
 
   it("works with empty cwd when a configured root matches (absolute)", () =>
-    expect(matchCd("cd /Users/you/repos/myapp/src", "", EXTRA)).toBe(true));
+    expect(matchCd("cd /Users/you/repos/my-monorepo/src", "", EXTRA)).toBe(true));
 
   it("multiple configured roots", () =>
     expect(matchCd("cd /srv/repo-b/pkg", CWD, ["/srv/repo-a", "/srv/repo-b"])).toBe(true));

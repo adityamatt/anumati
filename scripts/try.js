@@ -32,7 +32,7 @@
 // ─── AD-HOC COMMANDS (used only when no log file is passed) ───────────────────
 const COMMANDS = [
   {
-    value: `python3 -m venv /Users/you/source/project/.venv && /Users/you/source/project/.venv/bin/pip install python-dotenv example-repo requests -q && echo "ok"`,
+    value: `python3 -m venv /Users/you/project/.venv && /Users/you/project/.venv/bin/pip install python-dotenv requests -q && echo "ok"`,
   },
   {
     value: `which python3 && python3 -c "import dotenv; print('dotenv ok')" 2>/dev/null || echo "not installed"`,

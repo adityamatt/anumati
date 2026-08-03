@@ -19,7 +19,7 @@ describe("matchEslint — allow (read-only lint)", () => {
 
   it("cd <dir> && npx eslint ...", () =>
     expect(
-      matchEslint("cd /Users/a/repos/myapp/src/my-package && npx eslint lib/query/run-file.Handler.ts"),
+      matchEslint("cd /Users/you/repos/my-monorepo/src/my-package && npx eslint lib/query/run-file.Handler.ts"),
     ).toBe(true));
 
   it("eslint ... 2>&1 | head", () =>

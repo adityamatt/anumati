@@ -5,7 +5,7 @@ describe("matchAws — logs (allow read-only)", () => {
   it("describe-log-groups with query/output flags", () => {
     expect(
       matchAws(
-        `aws logs describe-log-groups --profile myapp-alpha --region eu-central-1 --query "logGroups[?contains(logGroupName, 'RunFile')].logGroupName" --output text`,
+        `aws logs describe-log-groups --profile myapp-dev --region eu-central-1 --query "logGroups[?contains(logGroupName, 'RunFile')].logGroupName" --output text`,
       ),
     ).toBe(true);
   });
@@ -13,7 +13,7 @@ describe("matchAws — logs (allow read-only)", () => {
   it("filter-log-events", () => {
     expect(
       matchAws(
-        `aws logs filter-log-events --log-group-name "/aws/lambda/dev-you-MyApp-QueryRunnerRunFileHandler" --profile myapp-alpha --region eu-central-1`,
+        `aws logs filter-log-events --log-group-name "/aws/lambda/dev-myapp-RunFileHandler" --profile myapp-dev --region eu-central-1`,
       ),
     ).toBe(true);
   });
@@ -185,35 +185,35 @@ describe("matchAws — cloudformation (allow read-only)", () => {
   it("describe-stacks with query/output flags", () => {
     expect(
       matchAws(
-        `aws cloudformation describe-stacks --profile myapp-alpha --region us-west-2 --stack-name MyAppStack-9690717-111122223333-us-west-2 --query "Stacks[0].StackStatus" --output text`,
+        `aws cloudformation describe-stacks --profile myapp-dev --region us-west-2 --stack-name MyAppStack-abc123-111122223333-us-west-2 --query "Stacks[0].StackStatus" --output text`,
       ),
     ).toBe(true);
   });
   it("list-stacks", () => {
     expect(
       matchAws(
-        `aws cloudformation list-stacks --profile myapp-alpha --region us-west-2 --query "StackSummaries[?StackStatus!='DELETE_COMPLETE'].StackName" --output text`,
+        `aws cloudformation list-stacks --profile myapp-dev --region us-west-2 --query "StackSummaries[?StackStatus!='DELETE_COMPLETE'].StackName" --output text`,
       ),
     ).toBe(true);
   });
   it("describe-stack-resources", () => {
     expect(
       matchAws(
-        `aws cloudformation describe-stack-resources --profile myapp-alpha --region us-west-2 --stack-name MyAppStack-9690717-111122223333-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text`,
+        `aws cloudformation describe-stack-resources --profile myapp-dev --region us-west-2 --stack-name MyAppStack-abc123-111122223333-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text`,
       ),
     ).toBe(true);
   });
   it("describe-stacks | head", () => {
     expect(
       matchAws(
-        `aws cloudformation describe-stacks --profile myapp-alpha --region us-west-2 --query "Stacks[?contains(StackName,'MyAppStack')].StackName" --output text | head`,
+        `aws cloudformation describe-stacks --profile myapp-dev --region us-west-2 --query "Stacks[?contains(StackName,'MyAppStack')].StackName" --output text | head`,
       ),
     ).toBe(true);
   });
   it("describe-stack-resources | tr | grep", () => {
     expect(
       matchAws(
-        `aws cloudformation describe-stack-resources --profile myapp-prod --region us-west-2 --stack-name MyAppStack-9690717-444455556666-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text | tr '\\t' '\\n' | grep -i "ChangeSetRole"`,
+        `aws cloudformation describe-stack-resources --profile myapp-prod --region us-west-2 --stack-name MyAppStack-abc123-444455556666-us-west-2 --query "StackResources[?ResourceType=='AWS::IAM::Role'].PhysicalResourceId" --output text | tr '\\t' '\\n' | grep -i "ChangeSetRole"`,
       ),
     ).toBe(true);
   });

@@ -81,7 +81,7 @@ const ALLOW_PYTHON: Rule = {
   desc: "safe python3 pipe",
 };
 
-const ALLOW_HIKER_WITH_PYTHON: Rule = {
+const ALLOW_API_WITH_PYTHON: Rule = {
   tool: "Bash", matcher: "curl",
   allowed_domains: ["api.example.com"],
   allowed_imports: ["sys", "html.parser"],
@@ -174,13 +174,13 @@ describe("evaluate — nodejs-pipe standalone", () => {
 
 describe("evaluate — curl piped to python3", () => {
   it("allows curl | python3 -c with safe imports", () => {
-    const cmd = `curl -s "https://api.example.com/p/user-liked-posts" 2>/dev/null | python3 -c "import sys; from html.parser import HTMLParser; print(sys.stdin.read())"`;
-    expect(evaluate(bash(cmd), [ALLOW_HIKER_WITH_PYTHON]).decision).toBe("allow");
+    const cmd = `curl -s "https://api.example.com/v1/records" 2>/dev/null | python3 -c "import sys; from html.parser import HTMLParser; print(sys.stdin.read())"`;
+    expect(evaluate(bash(cmd), [ALLOW_API_WITH_PYTHON]).decision).toBe("allow");
   });
 
   it("returns null for curl | python3 with unlisted import", () => {
     const cmd = `curl -s "https://api.example.com/p/" | python3 -c "import os; os.system('id')"`;
-    expect(evaluate(bash(cmd), [ALLOW_HIKER_WITH_PYTHON]).decision).toBeNull();
+    expect(evaluate(bash(cmd), [ALLOW_API_WITH_PYTHON]).decision).toBeNull();
   });
 
   it("returns null for curl | python3 when rule has no allowed_imports", () => {
@@ -197,15 +197,15 @@ const ALLOW_GH: Rule = {
 };
 
 describe("evaluate — python3-pipe with open.allowed_paths", () => {
-  const INSTA_DIR = "/Users/you/source/project/";
+  const DATA_DIR = "/Users/you/project/";
   const rule: Rule = {
     tool: "Bash", matcher: "python3-pipe",
     allowed_imports: ["json"],
-    open: { allowed_paths: [INSTA_DIR] },
+    open: { allowed_paths: [DATA_DIR] },
   };
 
   it("allows open() with path inside allowed dir", () => {
-    const cmd = `python3 -c "import json\nwith open('${INSTA_DIR}likes/liked_posts.json') as f: print(f.read())"`;
+    const cmd = `python3 -c "import json\nwith open('${DATA_DIR}data/records.json') as f: print(f.read())"`;
     expect(evaluate(bash(cmd), [rule]).decision).toBe("allow");
   });
 
@@ -215,7 +215,7 @@ describe("evaluate — python3-pipe with open.allowed_paths", () => {
   });
 
   it("returns null for path traversal", () => {
-    const cmd = `python3 -c "open('${INSTA_DIR}../../etc/passwd')"`;
+    const cmd = `python3 -c "open('${DATA_DIR}../../etc/passwd')"`;
     expect(evaluate(bash(cmd), [rule]).decision).toBeNull();
   });
 
@@ -226,7 +226,7 @@ describe("evaluate — python3-pipe with open.allowed_paths", () => {
 
   it("returns null for open() when open config absent", () => {
     const ruleNoPath: Rule = { tool: "Bash", matcher: "python3-pipe", allowed_imports: ["json"] };
-    const cmd = `python3 -c "open('${INSTA_DIR}likes/liked_posts.json')"`;
+    const cmd = `python3 -c "open('${DATA_DIR}data/records.json')"`;
     expect(evaluate(bash(cmd), [ruleNoPath]).decision).toBeNull();
   });
 
@@ -440,7 +440,7 @@ describe("evaluate — npx vite build / tsc via build-tool + npx-tsc", () => {
 
   it("allows cd <dir> && npx tsc --noEmit … && npx vite build … (composes)", () => {
     const cmd =
-      "cd /Users/you/you/repos/my-package/src/my-package && npx tsc --noEmit 2>&1 | head && npx vite build 2>&1 | tail -2";
+      "cd /Users/you/repos/my-monorepo/src/my-package && npx tsc --noEmit 2>&1 | head && npx vite build 2>&1 | tail -2";
     expect(evaluate(bashCwd(cmd), rules).decision).toBe("allow");
   });
 

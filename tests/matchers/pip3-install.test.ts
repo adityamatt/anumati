@@ -14,7 +14,7 @@ describe("matchPip3Install — wildcard *", () => {
 });
 
 describe("matchPip3Install — venv + path pip", () => {
-  const VENV = "/Users/you/source/project/.venv";
+  const VENV = "/Users/you/project/.venv";
 
   it("allows python3 -m venv alone", () => {
     expect(matchPip3Install(`python3 -m venv ${VENV}`, PKGS)).toBe(true);

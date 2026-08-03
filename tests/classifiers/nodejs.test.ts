@@ -129,19 +129,19 @@ describe("KNOWN_SAFE_MODULES", () => {
 });
 
 describe("isSafeNodejsCode — require() of a file path (allowed_paths)", () => {
-  const PATHS = ["/Users/x/repo/"];
+  const PATHS = ["/Users/you/repo/"];
 
   it("allows requiring a file under an allowed path prefix", () => {
-    expect(isSafeNodejsCode('const l=require("/Users/x/repo/package-lock.json")', [], PATHS)).toBe(true);
+    expect(isSafeNodejsCode('const l=require("/Users/you/repo/package-lock.json")', [], PATHS)).toBe(true);
   });
 
   it("allows a relative ./ path when it resolves under an allowed prefix", () => {
     // relative specifiers are path-checked verbatim; a matching prefix passes
-    expect(isSafeNodejsCode('require("/Users/x/repo/sub/data.json")', [], PATHS)).toBe(true);
+    expect(isSafeNodejsCode('require("/Users/you/repo/sub/data.json")', [], PATHS)).toBe(true);
   });
 
   it("blocks a file-path require when NO allowed_paths configured", () => {
-    expect(isSafeNodejsCode('require("/Users/x/repo/pkg.json")', ["path"])).toBe(false);
+    expect(isSafeNodejsCode('require("/Users/you/repo/pkg.json")', ["path"])).toBe(false);
   });
 
   it("blocks a path outside the allowlist", () => {
@@ -149,7 +149,7 @@ describe("isSafeNodejsCode — require() of a file path (allowed_paths)", () => 
   });
 
   it("blocks path traversal even under an allowed prefix", () => {
-    expect(isSafeNodejsCode('require("/Users/x/repo/../../etc/passwd")', [], PATHS)).toBe(false);
+    expect(isSafeNodejsCode('require("/Users/you/repo/../../etc/passwd")', [], PATHS)).toBe(false);
   });
 
   it("still blocks fs even when allowed_paths is set (no filesystem module backdoor)", () => {
@@ -158,7 +158,7 @@ describe("isSafeNodejsCode — require() of a file path (allowed_paths)", () => 
 
   it("mixes a builtin module and an allowed file path", () => {
     expect(
-      isSafeNodejsCode('const p=require("path"); const l=require("/Users/x/repo/l.json")', ["path"], PATHS),
+      isSafeNodejsCode('const p=require("path"); const l=require("/Users/you/repo/l.json")', ["path"], PATHS),
     ).toBe(true);
   });
 
