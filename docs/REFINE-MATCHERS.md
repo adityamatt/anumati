@@ -6,12 +6,17 @@ approved. This workflow turns that log into action: it categorizes the
 passthroughs, auto-applies the safe config tweaks, implements the safe new
 matchers (with tests), and opens a PR — end to end.
 
-There are two pieces:
+There are three pieces:
 
 1. **`scripts/triage-passthrough.js`** — a deterministic categorizer. Safe to
    run anytime; it never executes a logged command.
-2. **`workflows/refine-matchers.js`** — the end-to-end workflow that
-   runs the script, applies config, writes code, verifies, and ships a PR.
+2. **`workflows/refine-matchers.js`** — the end-to-end *Workflow* (multi-agent
+   orchestration) that runs the script, applies config, writes code, verifies,
+   and ships a PR.
+3. **`scripts/refine-matchers.js`** — the same end-to-end run as a *plain
+   script*: it owns the deterministic phases directly and only calls headless
+   `claude -p` for the safety gate and implementation. Run it from any terminal
+   with no orchestration runtime (see §3).
 
 ---
 
@@ -171,6 +176,64 @@ redo only as a rare fallback).
 
 ---
 
+## 3. The standalone script (no orchestration)
+
+> Requires the `claude` CLI on your PATH. No multi-agent runtime, no "use a
+> workflow" — just run it.
+
+`scripts/refine-matchers.js` is the no-orchestration sibling of the Workflow.
+It runs the **same six phases**, but instead of routing every step through a
+subagent it owns all the deterministic control flow directly and only shells out
+to `claude -p` (headless Claude Code) at the two steps that need judgment:
+
+| Phase | Who does it |
+|---|---|
+| Triage | the script (spawns `triage-passthrough.js`) |
+| Config | the script (spawns the verified `anumati add …` commands) |
+| **Safety gate** | **`claude -p`** — one call per candidate, in parallel |
+| **Implement** | **`claude -p`** — one call per approved candidate, sequential |
+| Verify | the script (`build` + `tsc --noEmit` + `vitest run`) |
+| Ship | the script (`git` + `gh` with a script-computed file list) |
+
+Only 2 of 6 phases call the LLM. The script holds the triage data in memory (no
+"read the JSON file back" workaround needed) and computes the exact `git add`
+list itself, filtering the same `NEVER_STAGE` denylist as the Workflow.
+
+```bash
+npm run refine                       # build + full run: triage → PR
+node scripts/refine-matchers.js --dry-run    # stop after the safety gate (no code, no cost past the gate)
+node scripts/refine-matchers.js --no-ship    # implement + verify, but don't commit/push/PR
+```
+
+Flags (all optional):
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--repo <dir>` | this repo | Repo root. |
+| `--log <path>` | `~/.claude/anumati-passthrough.jsonl` | Passthrough log. |
+| `--config <path>` | `~/.claude/permissions.json` | Live config to extend. |
+| `--no-config` | off | Skip auto-applying config extensions. |
+| `--max-candidates <n>` | `12` | Cap on code candidates reviewed/implemented. |
+| `--model <name>` | claude default | Pin the model for the `claude -p` calls. |
+| `--dry-run` | off | Run triage + config + safety gate, then stop (no code written). |
+| `--no-ship` | off | Implement + verify, but leave changes in the working tree. |
+| `--base <branch>` | `main` | PR base branch. |
+
+Each `claude -p` call is scoped: the safety gate is read-only
+(`--allowedTools Read,Grep,Glob`, `--permission-mode default`); the implementer
+gets edit tools (`--allowedTools Read,Edit,Write,Bash,Grep,Glob`,
+`--permission-mode acceptEdits`). The script prints a running LLM cost total
+(summed from each call's `total_cost_usd`).
+
+**Workflow vs standalone — which to use?** The Workflow gives you the live
+`/workflows` progress tree and token-budget integration and is the right call
+inside a Claude Code session ("use a workflow"). The standalone script is for
+running it *outside* a session — from a plain terminal, a `Makefile`, or cron —
+anywhere you just want `node scripts/refine-matchers.js` to do the whole thing.
+Both share `triage-passthrough.js` and apply the same safety gate.
+
+---
+
 ## Routine use
 
 Run the triage script whenever you've accumulated passthroughs and want to see
@@ -180,5 +243,6 @@ what's coverable:
 npm run build && node scripts/triage-passthrough.js
 ```
 
-Skim `triage-report.md`. If there's a batch worth acting on, kick off the
-workflow with today's date as the stamp and review the PR it opens.
+Skim `triage-report.md`. If there's a batch worth acting on, either kick off the
+Workflow (inside a Claude Code session) or run `npm run refine` (a plain
+terminal) — both open a PR for you to review.

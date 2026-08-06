@@ -19,6 +19,7 @@
     "prepublishOnly": "npm run build && npm test",
     "dev": "ts-node src/index.ts",
     "try": "npm run build -s && node scripts/try.js",
+    "refine": "npm run build -s && node scripts/refine-matchers.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
