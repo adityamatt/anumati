@@ -26,6 +26,7 @@ import { matchNpxTsc } from "./matchers/npx-tsc.js";
 import { matchEslint } from "./matchers/eslint.js";
 import { matchPrettier } from "./matchers/prettier.js";
 import { matchNodeScript } from "./matchers/node-script.js";
+import { matchMkdir } from "./matchers/mkdir.js";
 
 export interface Suggestion {
   /** The anumati CLI command to run to apply this suggestion */
@@ -309,6 +310,13 @@ function suggestNewRule(
         trigger: cmd,
       };
     }
+  }
+  if (!has("mkdir") && matchMkdir(cmd)) {
+    return noParamSuggestion(
+      "mkdir",
+      "Auto-approve mkdir -p/-v directory creation (no -m/--mode, no redirection)",
+      cmd,
+    );
   }
   // safe-inspect is the broadest matcher — try it last so more specific
   // families (git-read, cargo, go) win when they also apply.

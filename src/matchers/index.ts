@@ -25,6 +25,7 @@ import { matchPrettier } from "./prettier.js";
 import { matchGitPush } from "./git-push.js";
 import { matchGhPr } from "./gh-pr.js";
 import { matchNodeScript } from "./node-script.js";
+import { matchMkdir } from "./mkdir.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -56,6 +57,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "git-push":     return matchGitPush(cmd, rule.allowed_remotes ?? [], rule.protected_branches ?? []);
     case "gh-pr":        return matchGhPr(cmd);
     case "node-script":  return matchNodeScript(cmd, input.cwd ?? "", rule.open?.allowed_paths ?? []);
+    case "mkdir":        return matchMkdir(cmd);
     default:             return false;
   }
 }
