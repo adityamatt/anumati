@@ -18,6 +18,7 @@ import {
 import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
 import { runScaffold } from "./cli/scaffold.js";
+import { runUpdate } from "./cli/update.js";
 import { runApply } from "./cli/apply.js";
 import { runDebug } from "./cli/debug.js";
 import { runStats } from "./cli/stats.js";
@@ -245,6 +246,10 @@ Usage:
                                    Flags: --config P, --log P (passthrough log to
                                    analyze), --no-log (skip coverage counts).
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
+  anumati update [--check]         Update to the latest published version (npm install -g
+                                   anumati@latest). --check reports whether a newer version
+                                   exists without installing. The hook picks up the new
+                                   version on its next command — no restart needed.
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
   anumati stats                    Show auto-approved vs passed-through counts and ratio for Bash
@@ -289,6 +294,10 @@ function main(): void {
   }
   if (subcommand === "apply") {
     runApply(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "update") {
+    runUpdate(process.argv.slice(2));
     return;
   }
   if (subcommand === "debug") {

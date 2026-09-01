@@ -289,6 +289,42 @@ and `--allow-write` (a boolean flag for the `eslint`/`prettier` matchers —
 enables their in-place-write forms). Targets `~/.claude/permissions.json` by
 default; override with `--config <path>`.
 
+### `anumati scaffold`
+
+Advertise the full matcher catalog. Adds every supported matcher not already in
+the config as a **disabled placeholder** (`enabled: false`) — inert (evaluate
+skips it; suggest treats it as absent), so you can see what exists without
+turning anything on. Enable one with `anumati add <matcher>` (which clears the
+flag). Also reads the passthrough log and annotates each added matcher with how
+many fall-through commands enabling it would cover.
+
+```bash
+anumati scaffold                 # ~/.claude/permissions.json, default passthrough log
+anumati scaffold --config <path> # a specific config
+anumati scaffold --log <path>    # a specific passthrough log to analyze
+anumati scaffold --no-log        # skip the coverage counts
+```
+
+Idempotent — a matcher already present (enabled or disabled) is left untouched.
+
+### `anumati update`
+
+Update to the latest published version so you don't have to remember the npm
+incantation:
+
+```bash
+anumati update           # install anumati@latest if a newer version exists
+anumati update --check   # report whether a newer version exists; don't install
+anumati update --force   # run the global install even from a source checkout
+```
+
+It reads the latest version via `npm view`, compares, and runs
+`npm install -g anumati@latest` only when newer. Because the hook is wired as
+`anumati <config>` (resolved through PATH each call), the update takes effect on
+the next command — no restart. Run from a **source checkout** (a clone with
+`src/`), it prints git-based update guidance instead and does nothing unless
+`--force` is given.
+
 ### `anumati stats`
 
 Report how many Bash calls were auto-approved vs passed through, with the

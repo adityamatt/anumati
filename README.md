@@ -78,6 +78,11 @@ npm install -g anumati
 
 Or run without installing via `npx anumati ~/.claude/permissions.json`.
 
+Update to the latest version any time with `anumati update` (it checks the
+published version and, if newer, runs the global reinstall for you; the hook
+picks it up on the next command). `anumati update --check` just reports whether
+a newer version exists.
+
 ## Quick start
 
 One command sets up everything:

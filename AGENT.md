@@ -92,6 +92,8 @@ anumati add <matcher> [--domain/--imports/--modules/--packages/--scripts/--repos
 anumati scaffold [--config P] [--log P] [--no-log]   # add every catalog matcher not yet present as a DISABLED
                                 # placeholder; annotates each with how many passthrough-log commands it would cover
 anumati apply [--all|--clear] [--config P]
+anumati update [--check] [--force]   # npm i -g anumati@latest when newer; --check = report only.
+                                # Guarded: refuses inside a source checkout (has src/) unless --force.
 ```
 
 ## Config location
