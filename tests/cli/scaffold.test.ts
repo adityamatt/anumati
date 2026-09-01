@@ -28,7 +28,7 @@ function bash(command: string): HookInput {
 
 describe("applyScaffold", () => {
   it("creates a config and adds every catalog matcher as a disabled placeholder", () => {
-    const res = applyScaffold({ config: configPath });
+    const res = applyScaffold({ config: configPath, skipLog: true });
 
     expect(res.created).toBe(true);
     expect(existsSync(configPath)).toBe(true);
@@ -46,8 +46,8 @@ describe("applyScaffold", () => {
   });
 
   it("is idempotent — a second run adds nothing", () => {
-    applyScaffold({ config: configPath });
-    const res2 = applyScaffold({ config: configPath });
+    applyScaffold({ config: configPath, skipLog: true });
+    const res2 = applyScaffold({ config: configPath, skipLog: true });
 
     expect(res2.added).toEqual([]);
     expect(res2.alreadyPresent.sort()).toEqual([...MATCHER_NAMES].sort());
@@ -62,7 +62,7 @@ describe("applyScaffold", () => {
       }),
     );
 
-    const res = applyScaffold({ config: configPath });
+    const res = applyScaffold({ config: configPath, skipLog: true });
 
     expect(res.alreadyPresent).toContain("curl");
     expect(res.added.map((m) => m.name)).not.toContain("curl");
@@ -79,7 +79,7 @@ describe("applyScaffold", () => {
       JSON.stringify({ allow: [{ tool: "Bash", matcher: "docker-read", enabled: false }] }),
     );
 
-    const res = applyScaffold({ config: configPath });
+    const res = applyScaffold({ config: configPath, skipLog: true });
 
     expect(res.alreadyPresent).toContain("docker-read");
     expect(read().allow!.filter((r) => r.matcher === "docker-read")).toHaveLength(1);
@@ -90,12 +90,12 @@ describe("applyScaffold", () => {
       configPath,
       JSON.stringify({ audit: { audit_file: "/tmp/a.json" }, allow: [] }),
     );
-    applyScaffold({ config: configPath });
+    applyScaffold({ config: configPath, skipLog: true });
     expect(read().audit).toEqual({ audit_file: "/tmp/a.json" });
   });
 
   it("scaffolded placeholders never auto-approve anything (evaluate skips them)", () => {
-    applyScaffold({ config: configPath });
+    applyScaffold({ config: configPath, skipLog: true });
     const rules = read().allow!;
 
     // safe-inspect would normally approve `ls -la`, but as a disabled
@@ -105,9 +105,80 @@ describe("applyScaffold", () => {
   });
 });
 
+describe("applyScaffold — passthrough coverage", () => {
+  let logPath: string;
+
+  function writeLog(entries: Array<Record<string, unknown>>): void {
+    logPath = join(dir, "anumati-passthrough.jsonl");
+    writeFileSync(logPath, entries.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  }
+  const pass = (command: string) => ({ tool: "Bash", command, decision: "passthrough" });
+
+  it("attributes fall-through commands to the matcher that would cover them", () => {
+    writeLog([
+      pass("docker ps"),
+      pass("docker ps"), // repeat → occurrences > distinct
+      pass("docker images"),
+      pass("git status"),
+      pass("ls -la"),
+      pass("rm -rf /tmp/x"), // destructive → no matcher, uncounted
+      pass("docker run -it ubuntu bash"), // mutating docker → docker-read rejects, uncounted
+    ]);
+
+    const res = applyScaffold({ config: configPath, log: logPath });
+    const by = new Map(res.coverage!.byMatcher.map((s) => [s.matcher, s]));
+
+    expect(res.coverage!.found).toBe(true);
+    expect(by.get("docker-read")).toEqual({ matcher: "docker-read", distinct: 2, occurrences: 3 });
+    expect(by.get("git-read")!.distinct).toBe(1);
+    expect(by.get("safe-inspect")!.distinct).toBe(1);
+    // Destructive / mutating shapes are never attributed to a matcher.
+    expect([...by.keys()]).not.toContain(undefined);
+    expect(res.coverage!.byMatcher.reduce((n, s) => n + s.distinct, 0)).toBe(4);
+  });
+
+  it("does not count commands already auto-approved by an enabled rule", () => {
+    // safe-inspect is already ON, so its `ls` passthroughs are historical and
+    // must not be attributed as 'would cover'.
+    writeFileSync(
+      configPath,
+      JSON.stringify({ allow: [{ tool: "Bash", matcher: "safe-inspect" }] }),
+    );
+    writeLog([pass("ls -la"), pass("docker ps")]);
+
+    const res = applyScaffold({ config: configPath, log: logPath });
+    const by = new Map(res.coverage!.byMatcher.map((s) => [s.matcher, s]));
+
+    expect(by.has("safe-inspect")).toBe(false); // already covered → not counted
+    expect(by.get("docker-read")!.distinct).toBe(1);
+  });
+
+  it("reports found:false when the log is missing (no crash)", () => {
+    const res = applyScaffold({ config: configPath, log: join(dir, "nope.jsonl") });
+    expect(res.coverage).toEqual({
+      logPath: join(dir, "nope.jsonl"),
+      found: false,
+      totalPassthroughs: 0,
+      byMatcher: [],
+    });
+  });
+
+  it("skips analysis entirely with skipLog", () => {
+    const res = applyScaffold({ config: configPath, skipLog: true });
+    expect(res.coverage).toBeNull();
+  });
+
+  it("tolerates malformed log lines", () => {
+    logPath = join(dir, "anumati-passthrough.jsonl");
+    writeFileSync(logPath, `not json\n${JSON.stringify(pass("docker ps"))}\n\n{bad\n`);
+    const res = applyScaffold({ config: configPath, log: logPath });
+    expect(res.coverage!.byMatcher.find((s) => s.matcher === "docker-read")!.distinct).toBe(1);
+  });
+});
+
 describe("scaffold + add integration", () => {
   it("`anumati add` turns on a scaffolded (disabled) matcher", () => {
-    applyScaffold({ config: configPath });
+    applyScaffold({ config: configPath, skipLog: true });
     expect(evaluate(bash("ls -la"), read().allow!).decision).toBeNull();
 
     applyAdd({ matcher: "safe-inspect", config: configPath });

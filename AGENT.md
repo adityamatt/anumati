@@ -89,7 +89,8 @@ npm run build    # tsc → dist/
 npm test         # vitest run
 npm run dev      # ts-node src/index.ts (without build)
 anumati add <matcher> [--domain/--imports/--modules/--packages/--scripts/--repos/--paths X[,Y]] [--config P]
-anumati scaffold [--config P]   # add every catalog matcher not yet present as a DISABLED placeholder
+anumati scaffold [--config P] [--log P] [--no-log]   # add every catalog matcher not yet present as a DISABLED
+                                # placeholder; annotates each with how many passthrough-log commands it would cover
 anumati apply [--all|--clear] [--config P]
 ```
 
@@ -114,7 +115,7 @@ Default: `~/.claude/permissions.json`. Pass alternate path as first arg.
 
 anumati is **allow-only** — there is no deny list. Matchers approve safe patterns; anything unmatched falls through to Claude Code's dialog.
 
-The canonical list of matcher names lives in `src/matchers/registry.ts` (`MATCHERS`), kept in lockstep with the `matchNamed()` switch by `tests/matchers/registry.test.ts`. `anumati scaffold` iterates that catalog and writes any not-yet-present matcher into a config as a disabled placeholder (`enabled:false`) so it's discoverable without being on. This table is the human-readable mirror — add a row here when you add a matcher.
+The canonical list of matcher names lives in `src/matchers/registry.ts` (`MATCHERS`), kept in lockstep with the `matchNamed()` switch by `tests/matchers/registry.test.ts`. `anumati scaffold` iterates that catalog and writes any not-yet-present matcher into a config as a disabled placeholder (`enabled:false`) so it's discoverable without being on. It also reads the passthrough log and, reusing the real `evaluate()`/`suggest()` engine, annotates each added matcher with how many fall-through commands enabling it would cover. This table is the human-readable mirror — add a row here when you add a matcher.
 
 | Matcher | Tool | Effect | Key param |
 |---|---|---|---|

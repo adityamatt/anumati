@@ -235,11 +235,15 @@ Usage:
   anumati add <matcher> [flags]    Add or extend an allow rule in a config.
                                    Also enables (clears the disabled flag on) a
                                    matcher previously written by \`scaffold\`.
-  anumati scaffold [--config P]    Advertise the full matcher catalog: add every
+  anumati scaffold [flags]         Advertise the full matcher catalog: add every
                                    supported matcher not already in the config as
                                    a DISABLED placeholder (enabled:false), then
-                                   print what was added. Enable any with
-                                   \`anumati add <matcher>\`.
+                                   print what was added. Reads the passthrough log
+                                   and annotates each with how many fall-through
+                                   commands enabling it would cover. Enable any
+                                   with \`anumati add <matcher>\`.
+                                   Flags: --config P, --log P (passthrough log to
+                                   analyze), --no-log (skip coverage counts).
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
