@@ -15,12 +15,37 @@ of contributing.
   watch commands get auto-approved). The unit tests and `npm run try` don't need
   it, but exercising the actual hook does.
 - **Node.js ≥ 18** (CI runs on Node 20) and npm.
-- A clone of the repo:
+- A **GitHub account**, and optionally the [`gh` CLI](https://cli.github.com) —
+  it makes forking and opening PRs a one-liner (and the matcher-generation
+  pipeline below uses it to open the PR).
+
+## Fork and clone
+
+anumati uses the fork-and-PR model: you contribute from **your own fork**, not
+the upstream repo directly.
+
+Fork with the `gh` CLI (forks, clones your fork, and wires the `upstream` remote
+in one step):
 
 ```bash
-git clone https://github.com/adityamatt/anumati.git
+gh repo fork adityamatt/anumati --clone
 cd anumati
+```
+
+Or click **Fork** on GitHub, then clone your fork and add the upstream remote
+manually:
+
+```bash
+git clone https://github.com/<your-username>/anumati.git
+cd anumati
+git remote add upstream https://github.com/adityamatt/anumati.git
+```
+
+Then install dependencies, and keep your fork current before starting work:
+
+```bash
 npm install
+git fetch upstream && git merge upstream/main   # (or: git rebase upstream/main)
 ```
 
 `dist/` is gitignored, so you always build from source.
@@ -202,14 +227,25 @@ Full phase-by-phase details and safety properties are in
 
 ## Opening a pull request
 
-1. Branch off `main`.
+1. Create a branch off `main` (`git checkout -b my-change`).
 2. Make sure `npm run build`, `npx tsc --noEmit`, and `npm test` all pass.
 3. Use a conventional-commit-style subject (`feat:`, `fix:`, `chore:`, `docs:`),
    matching the existing history.
 4. Do **not** bump the version or edit `package.json`'s `version` — releases are
    automated (see below).
-5. Open the PR against `main` with a short description of what changed and why,
-   including the shapes newly approved/rejected if you touched a matcher.
+5. Push the branch to **your fork** and open the PR against `adityamatt/anumati`'s
+   `main`:
+
+   ```bash
+   git push -u origin my-change
+   gh pr create --repo adityamatt/anumati --base main   # or open it from the GitHub UI
+   ```
+
+   Include a short description of what changed and why — plus the shapes newly
+   approved/rejected if you touched a matcher.
+
+(The matcher-generation pipeline above does this push + PR step for you, from
+whatever fork your `origin` points at.)
 
 ## Releasing (maintainers)
 
