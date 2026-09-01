@@ -27,6 +27,7 @@ import { matchEslint } from "./matchers/eslint.js";
 import { matchPrettier } from "./matchers/prettier.js";
 import { matchNodeScript } from "./matchers/node-script.js";
 import { matchMkdir } from "./matchers/mkdir.js";
+import { matchDockerRead } from "./matchers/docker-read.js";
 
 export interface Suggestion {
   /** The anumati CLI command to run to apply this suggestion */
@@ -315,6 +316,13 @@ function suggestNewRule(
     return noParamSuggestion(
       "mkdir",
       "Auto-approve mkdir -p/-v directory creation (no -m/--mode, no redirection)",
+      cmd,
+    );
+  }
+  if (!has("docker-read") && matchDockerRead(cmd)) {
+    return noParamSuggestion(
+      "docker-read",
+      "Auto-approve read-only docker inspection commands (ps/images/inspect/logs/…)",
       cmd,
     );
   }

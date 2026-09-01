@@ -41,6 +41,34 @@ describe("matchVitest — allow", () => {
   it("cd <dir> && npx vitest run | tail", () => {
     expect(matchVitest("cd /tmp && npx vitest run | tail -20")).toBe(true);
   });
+
+  it("pnpm exec vitest run", () => {
+    expect(matchVitest("pnpm exec vitest run")).toBe(true);
+  });
+
+  it("npm exec vitest run", () => {
+    expect(matchVitest("npm exec vitest run")).toBe(true);
+  });
+
+  it("yarn exec vitest run", () => {
+    expect(matchVitest("yarn exec vitest run")).toBe(true);
+  });
+
+  it("pnpm exec vitest run <path> 2>&1 | grep (real example)", () => {
+    expect(
+      matchVitest(
+        'pnpm exec vitest run src/skills/task-inventory-miner.test.ts 2>&1 | grep -E "Tests |failed|passed"',
+      ),
+    ).toBe(true);
+  });
+
+  it("cd <dir> && pnpm exec vitest run <path> 2>&1 | grep | head (real example)", () => {
+    expect(
+      matchVitest(
+        'cd /Users/uneet/code/Argide-autoskill-generation/apps/worker && pnpm exec vitest run src/services/page-graph-skills.test.ts 2>&1 | grep -E "×|Tests |failed|ReferenceError|Error:" | head -12',
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("matchVitest — block", () => {
@@ -90,6 +118,26 @@ describe("matchVitest — block", () => {
 
   it("not vitest", () => {
     expect(matchVitest("npx jest run")).toBe(false);
+  });
+
+  it("pnpm dlx vitest run (network fetch)", () => {
+    expect(matchVitest("pnpm dlx vitest run")).toBe(false);
+  });
+
+  it("pnpm exec rm -rf (arbitrary exec, not vitest)", () => {
+    expect(matchVitest("pnpm exec rm -rf /")).toBe(false);
+  });
+
+  it("pnpm exec vitest (no run subcommand)", () => {
+    expect(matchVitest("pnpm exec vitest")).toBe(false);
+  });
+
+  it("pnpm exec vitest watch", () => {
+    expect(matchVitest("pnpm exec vitest watch")).toBe(false);
+  });
+
+  it("bare pnpm exec (nothing after launcher)", () => {
+    expect(matchVitest("pnpm exec")).toBe(false);
   });
 
   it("empty command", () => {
