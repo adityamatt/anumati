@@ -17,6 +17,7 @@ import {
 } from "./suggest-store.js";
 import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
+import { runScaffold } from "./cli/scaffold.js";
 import { runApply } from "./cli/apply.js";
 import { runDebug } from "./cli/debug.js";
 import { runStats } from "./cli/stats.js";
@@ -232,6 +233,13 @@ Usage:
                                    (--no-audit / --no-hook / --no-banner / --no-steer to skip;
                                    --debug to start with debug mode on).
   anumati add <matcher> [flags]    Add or extend an allow rule in a config.
+                                   Also enables (clears the disabled flag on) a
+                                   matcher previously written by \`scaffold\`.
+  anumati scaffold [--config P]    Advertise the full matcher catalog: add every
+                                   supported matcher not already in the config as
+                                   a DISABLED placeholder (enabled:false), then
+                                   print what was added. Enable any with
+                                   \`anumati add <matcher>\`.
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
@@ -269,6 +277,10 @@ function main(): void {
   }
   if (subcommand === "add") {
     runAdd(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "scaffold") {
+    runScaffold(process.argv.slice(2));
     return;
   }
   if (subcommand === "apply") {

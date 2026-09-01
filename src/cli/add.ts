@@ -65,6 +65,11 @@ export function applyAdd(opts: AddOptions): AddResult {
     rules.push(rule);
   }
 
+  // An explicit `add` is a deliberate "turn this on", so clear any disabled
+  // placeholder that `anumati scaffold` may have written for this matcher —
+  // otherwise the matcher would stay inert even after the user added it.
+  if (rule.enabled === false) delete rule.enabled;
+
   const r = rule as unknown as Record<string, unknown>;
   if (opts.domains) mergeArray(r, "allowed_domains", opts.domains);
   if (opts.imports) mergeArray(r, "allowed_imports", opts.imports);

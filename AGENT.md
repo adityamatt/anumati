@@ -37,6 +37,9 @@ stdin (JSON from Claude Code)
 interface Rule {
   tool?: string;
   matcher?: string;            // named matcher (required — no regex fallback)
+  enabled?: boolean;           // off switch — enabled:false is inert (evaluate skips it,
+                               //   suggest treats it as absent). `anumati scaffold` writes
+                               //   one disabled placeholder per matcher; `add` clears it.
   allowed_domains?: string[];  // curl
   scheme?: "http" | "https";   // curl — required scheme for allowed_domains (default https)
   allowed_imports?: string[];  // python3-pipe
@@ -86,6 +89,7 @@ npm run build    # tsc → dist/
 npm test         # vitest run
 npm run dev      # ts-node src/index.ts (without build)
 anumati add <matcher> [--domain/--imports/--modules/--packages/--scripts/--repos/--paths X[,Y]] [--config P]
+anumati scaffold [--config P]   # add every catalog matcher not yet present as a DISABLED placeholder
 anumati apply [--all|--clear] [--config P]
 ```
 
@@ -109,6 +113,8 @@ Default: `~/.claude/permissions.json`. Pass alternate path as first arg.
 ## Available matchers
 
 anumati is **allow-only** — there is no deny list. Matchers approve safe patterns; anything unmatched falls through to Claude Code's dialog.
+
+The canonical list of matcher names lives in `src/matchers/registry.ts` (`MATCHERS`), kept in lockstep with the `matchNamed()` switch by `tests/matchers/registry.test.ts`. `anumati scaffold` iterates that catalog and writes any not-yet-present matcher into a config as a disabled placeholder (`enabled:false`) so it's discoverable without being on. This table is the human-readable mirror — add a row here when you add a matcher.
 
 | Matcher | Tool | Effect | Key param |
 |---|---|---|---|
@@ -137,6 +143,7 @@ anumati is **allow-only** — there is no deny list. Matchers approve safe patte
 | `vitest` | Bash | allow `[ (npm/pnpm/yarn) exec \| npx ] vitest run [paths/flags]` (+ cd && variant, pipe to builtins); `run` subcommand required so interactive watch mode is blocked; only `<pm> exec` advances the launcher (never `dlx`/network), and the token after it must be `vitest run` | — |
 | `aws` | Bash | nested composite: dispatches on service (`logs`, `stepfunctions`, `s3`/`s3api`, `dynamodb`, `lambda`, `sts`, `iam`, `cloudformation`, `cloudwatch`, `account`, `configure`) to a per-service read-only subcommand allowlist (list/describe/get/query/scan/filter; s3 = `ls` only, s3api = metadata reads, no get-object; dynamodb = get/query/scan/batch-get + describe/list, no put/update/delete/execute-statement; lambda = get/list only, no invoke/update/delete; sts = get-caller-identity only, no assume-role/token-minting; iam = get/list reads only, no create/update/delete/attach/put; cloudwatch = list/get/describe reads, no put-metric/put-dashboard/delete/set-alarm-state; account = list-regions/get-region-opt-status/get-contact-information, no enable/disable-region/put/delete; configure = get/list/list-profiles, no set/import/add-model); all writes + local-write commands blocked (+ cd && variant, pipe to builtins) | — |
 | `sleep` | Bash | allow a single bare `sleep <seconds>` (one integer arg); no operators/redirection — chaining is handled by evaluate() composition | — |
+| `echo` | Bash | allow a bare `echo …` (stdout only, common as `… && echo "=== done ==="`); reject file-writing redirects (`echo x > file`), stream redirects fine; single segment, chaining via evaluate() composition | — |
 | `mkdir` | Bash | allow `mkdir [-p/--parents] [-v/--verbose] <path…>` — mkdir can't clobber, so path operands are unconstrained; reject `-m`/`--mode` (permission-setting) and any unknown flag (fail closed), and any file-writing redirection; single segment only, chaining via evaluate() composition | — |
 | `docker-read` | Bash | allow read-only, one-shot `docker` inspection: strict subcommand allowlist (`ps`, `images`/`image ls`, `inspect`, `version`, `info`, `top`, `port`, `logs` without `-f`/`--follow`, `stats --no-stream`); optional leading env prefix restricted to docker connection vars (`DOCKER_HOST`/`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH`/`DOCKER_CONTEXT`/`DOCKER_CONFIG`) — any other `VAR=` rejected to block LD_PRELOAD/PATH injection; hard-blocks every mutating/exec/network/write subcommand (run/exec/rm/rmi/build/create/start/stop/kill/cp/commit/tag/push/pull/save/load/export/import/login/prune, system/volume/network/compose writes) and long-running/interactive forms (`logs -f`, `attach`, `events`, `wait`, streaming `stats`); no redirection, single segment, chaining via evaluate() composition (+ pipe to consumers) | — |
 

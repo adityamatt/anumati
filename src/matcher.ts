@@ -3,6 +3,11 @@ import { matchNamed } from "./matchers/index.js";
 import { parseCompound } from "./parser/shell.js";
 
 function ruleMatches(rule: Rule, input: HookInput): boolean {
+  // A disabled placeholder (e.g. one written by `anumati scaffold`) never
+  // matches anything — it exists only to advertise that the matcher is
+  // available, not to approve. Skip it before any matcher logic runs.
+  if (rule.enabled === false) return false;
+
   if (rule.tool && rule.tool !== input.tool_name) return false;
 
   if (rule.matcher) {

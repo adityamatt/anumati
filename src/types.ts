@@ -5,6 +5,16 @@ export interface OpenConfig {
 export interface Rule {
   tool?: string;
   matcher?: string;
+  /**
+   * Explicit off switch. A rule with `enabled: false` is inert everywhere —
+   * evaluate() never approves through it, and suggest() treats it as absent (so
+   * discovery nudges still fire). This is how `anumati scaffold` advertises the
+   * full matcher catalog: it writes one disabled placeholder per matcher so you
+   * can see what exists without turning anything on. Omitted (undefined) means
+   * enabled — the normal case. `anumati add <matcher>` clears it (an explicit
+   * add is a deliberate "turn this on").
+   */
+  enabled?: boolean;
   allowed_domains?: string[];
   /**
    * URL scheme the `curl` matcher requires for `allowed_domains`. "https"

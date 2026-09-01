@@ -63,6 +63,26 @@ describe("evaluate — passthrough", () => {
   });
 });
 
+describe("evaluate — disabled rules (enabled:false placeholders)", () => {
+  it("never approves through a disabled rule, even when the matcher would otherwise match", () => {
+    const disabled: Rule = { ...ALLOW_TSC, enabled: false };
+    expect(evaluate(bash("npx tsc --noEmit"), [disabled]).decision).toBeNull();
+  });
+
+  it("does not let a disabled rule satisfy a sub-command in sequential composition", () => {
+    const enabledInspect: Rule = { tool: "Bash", matcher: "safe-inspect" };
+    const disabledGit: Rule = { tool: "Bash", matcher: "git-read", enabled: false };
+    // `ls` is covered, but `git status` only by a DISABLED rule → whole thing fails.
+    expect(evaluate(bash("ls && git status"), [enabledInspect, disabledGit]).decision).toBeNull();
+  });
+
+  it("an enabled rule of the same matcher still approves alongside a disabled one", () => {
+    const disabled: Rule = { tool: "Bash", matcher: "npx-tsc", enabled: false };
+    const enabled: Rule = { tool: "Bash", matcher: "npx-tsc" };
+    expect(evaluate(bash("npx tsc --noEmit"), [disabled, enabled]).decision).toBe("allow");
+  });
+});
+
 describe("evaluate — tool filtering", () => {
   it("a Task-scoped rule does not match a Bash tool", () => {
     const taskRule: Rule = { tool: "Task", subagent_type: "x" };

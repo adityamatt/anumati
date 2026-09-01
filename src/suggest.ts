@@ -56,12 +56,18 @@ function suggestBash(input: HookInput, allRules: Rule[]): Suggestion | null {
   const cmd = input.tool_input.command ?? "";
   if (!cmd) return null;
 
+  // Disabled placeholders (from `anumati scaffold`) are treated as ABSENT here:
+  // otherwise the `has(matcher)` gate in suggestNewRule would see a scaffolded
+  // (but off) rule and suppress the very nudge that tells the user to turn it
+  // on. A disabled rule advertises the matcher; it does not count as coverage.
+  const active = allRules.filter((r) => r.enabled !== false);
+
   // Near-miss: an existing rule that would match if its allowlist was expanded.
-  const nearMiss = findNearMiss(cmd, allRules, input.cwd ?? "");
+  const nearMiss = findNearMiss(cmd, active, input.cwd ?? "");
   if (nearMiss) return nearMiss;
 
   // No near-miss — classify the command and suggest a brand-new rule.
-  return suggestNewRule(cmd, allRules, input.cwd ?? "");
+  return suggestNewRule(cmd, active, input.cwd ?? "");
 }
 
 // ── Near-miss detection ──────────────────────────────────────────────────────

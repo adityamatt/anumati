@@ -136,6 +136,17 @@ describe("applyAdd", () => {
     expect(read().allow).toHaveLength(1); // extended, not duplicated
   });
 
+  it("enables a scaffolded (disabled) placeholder by clearing the enabled flag", () => {
+    writeFileSync(
+      configPath,
+      JSON.stringify({ allow: [{ tool: "Bash", matcher: "safe-inspect", enabled: false }] }),
+    );
+    applyAdd({ matcher: "safe-inspect", config: configPath });
+    const rule = read().allow!.find((r) => r.matcher === "safe-inspect");
+    expect(rule!.enabled).toBeUndefined();
+    expect(read().allow).toHaveLength(1); // enabled in place, not duplicated
+  });
+
   it("preserves existing audit / unrelated config", () => {
     writeFileSync(
       configPath,

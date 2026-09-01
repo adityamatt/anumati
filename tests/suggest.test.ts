@@ -23,6 +23,34 @@ describe("suggest — tool gating", () => {
   });
 });
 
+describe("suggest — disabled placeholders are treated as absent", () => {
+  // A scaffolded (enabled:false) rule advertises a matcher but doesn't cover
+  // anything, so suggest must still nudge the user to turn it on. If it counted
+  // as coverage, the discovery nudge would never fire.
+  it("still suggests a NEW rule when only a disabled placeholder exists", () => {
+    const disabled: Rule = { tool: "Bash", matcher: "safe-inspect", enabled: false };
+    const s = suggest(bash("ls -la"), [disabled]);
+    expect(s).not.toBeNull();
+    expect(s!.matcher).toBe("safe-inspect");
+    expect(s!.command).toBe("anumati add safe-inspect");
+  });
+
+  it("still fires a near-miss when the owning rule is disabled", () => {
+    const disabled: Rule = {
+      tool: "Bash", matcher: "curl", allowed_domains: ["api.github.com"], enabled: false,
+    };
+    const s = suggest(bash("curl https://api.openai.com/v1/models"), [disabled]);
+    expect(s).not.toBeNull();
+    expect(s!.matcher).toBe("curl");
+  });
+
+  it("an ENABLED rule of the same matcher still suppresses the new-rule suggestion", () => {
+    const enabled: Rule = { tool: "Bash", matcher: "safe-inspect" };
+    // safe-inspect already covers `ls`, so there is nothing to suggest.
+    expect(suggest(bash("ls -la"), [enabled])).toBeNull();
+  });
+});
+
 describe("suggest — near-miss curl", () => {
   const rule: Rule = { tool: "Bash", matcher: "curl", allowed_domains: ["api.github.com"] };
 
