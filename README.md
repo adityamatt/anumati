@@ -128,6 +128,12 @@ anumati apply --all                         # apply accumulated suggestions
 - **[Command-style guide](docs/COMMAND-STYLE.md)** — how to write commands that
   land on the auto-approve path (also installed into `CLAUDE.md` by `init`).
 
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local setup — including running
+Claude Code against your local build via `npm link` — plus how to test, add a
+matcher, and open a PR.
+
 ## License
 
 MIT

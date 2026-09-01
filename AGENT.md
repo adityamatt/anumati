@@ -154,8 +154,10 @@ The canonical list of matcher names lives in `src/matchers/registry.ts` (`MATCHE
 
 1. Add `src/matchers/<name>.ts` — export a function taking `(command: string)` or `(filePath: string)`
 2. Add case in `src/matchers/index.ts` `matchNamed()` switch — unpack from `input`
-3. Add tests in `tests/matchers/<name>.test.ts`
-4. If the command shape is recognizable, teach `src/suggest.ts` to suggest it (add a `suggestNewRule` branch, and a near-miss branch if it has an allowlist param)
+3. Add a `{ name, desc }` entry to `MATCHERS` in `src/matchers/registry.ts` (the catalog `anumati scaffold` advertises). `tests/matchers/registry.test.ts` fails the build if the registry and the `matchNamed()` switch drift, so this is not optional.
+4. Add a row to the "Available matchers" table above (and to `docs/CONFIGURATION.md`)
+5. Add tests in `tests/matchers/<name>.test.ts`
+6. If the command shape is recognizable, teach `src/suggest.ts` to suggest it (add a `suggestNewRule` branch, and a near-miss branch if it has an allowlist param)
 
 For a segment-independent matcher (the command produces output that read-only
 consumers pipe from — cargo/go/git-read/vitest/aws), validate trailing pipe
