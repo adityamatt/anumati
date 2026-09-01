@@ -26,6 +26,7 @@ import { matchGitPush } from "./git-push.js";
 import { matchGhPr } from "./gh-pr.js";
 import { matchNodeScript } from "./node-script.js";
 import { matchMkdir } from "./mkdir.js";
+import { matchDockerRead } from "./docker-read.js";
 
 export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
   const cmd = input.tool_input.command ?? "";
@@ -58,6 +59,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "gh-pr":        return matchGhPr(cmd);
     case "node-script":  return matchNodeScript(cmd, input.cwd ?? "", rule.open?.allowed_paths ?? []);
     case "mkdir":        return matchMkdir(cmd);
+    case "docker-read":  return matchDockerRead(cmd);
     default:             return false;
   }
 }

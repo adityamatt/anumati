@@ -3,18 +3,26 @@ import { parseCompound, tokenize } from "../parser/shell.js";
 import { hasUnsafeRedirection } from "../parser/redirect.js";
 import { isSafePipeConsumer } from "../parser/pipe.js";
 
+const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn"]);
+
 // Reject file-writing / input redirection (safe stream redirects like
 // 2>/dev/null and 2>&1 are permitted); the parser leaves these in the raw text.
 function hasRedirection(raw: string): boolean {
   return hasUnsafeRedirection(raw);
 }
 
-// A vitest invocation is either `npx vitest run …` or a direct `vitest run …`.
+// A vitest invocation is a direct `vitest run …`, or one behind an exec
+// launcher: `npx vitest run …` or `(npm|pnpm|yarn) exec vitest run …`.
 // The `run` subcommand is REQUIRED: bare `vitest` (and `vitest watch`/`dev`)
 // launches interactive watch mode, which would hang the hook. `run` selection
 // args (paths, --coverage, --reporter, etc.) only pick what to run, so any
 // trailing args are fine. Test code execution itself is inherent to running
 // tests — the same trust already granted by the `cargo`/`go` (test) matchers.
+//
+// The launcher only advances the index past a `npx` or `<pm> exec` prefix; the
+// very next token must still be `vitest` and the one after `run`. So `pnpm dlx …`
+// (network fetch — never a `<pm> exec` shape) and `pnpm exec rm -rf …` / watch /
+// dev all fail closed.
 function isVitestSegment(raw: string): boolean {
   if (hasRedirection(raw)) return false;
 
@@ -24,6 +32,8 @@ function isVitestSegment(raw: string): boolean {
   let i = 0;
   if (basename(argv[0]) === "npx") {
     i = 1;
+  } else if (PACKAGE_MANAGERS.has(basename(argv[0])) && argv[1] === "exec") {
+    i = 2;
   }
 
   if (basename(argv[i] ?? "") !== "vitest") return false;
