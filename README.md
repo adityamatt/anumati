@@ -1,10 +1,13 @@
 # anumati
 
 **Stop approving the same Bash commands over and over.** anumati is a
-`PreToolUse` hook for [Claude Code](https://code.claude.com) that auto-allows
-_safe_ shell commands from a small config of **named matchers** — so `git
-status`, `npx tsc`, `cargo test`, `jq`, and friends just run, while genuinely
-risky commands still get a prompt.
+deterministic **auto-approver** for AI coding agents. From a small config of
+**named matchers** it auto-allows _safe_ shell commands — so `git status`,
+`npx tsc`, `cargo test`, `jq`, and friends just run, while genuinely risky
+commands still get a prompt. It's **agent-agnostic**: one shared config drives
+both [Claude Code](https://code.claude.com) (via its `PreToolUse` hook) and
+[OpenAI Codex](https://developers.openai.com/codex) (via its `PermissionRequest`
+hook).
 
 When something falls through, anumati tells you the exact one-liner to allow it
 next time — so your config **builds itself from real usage**.
@@ -26,7 +29,7 @@ $ terraform apply
   Redirects that write files, `$(...)` substitution, network `curl` to unlisted
   domains, `git push`, `rm` — all fall through to a real prompt. anumati is
   **allow-only**: it can approve a call or step aside, but never blocks anything
-  itself, and never widens what Claude Code would otherwise refuse.
+  itself, and never widens what the agent would otherwise refuse.
 - **Composes across a whole command line.** `git status && cargo build | tail`
   is approved only if _every_ piece is independently safe — you can't smuggle
   `rm -rf /` in by chaining it onto an allowed command.
@@ -34,15 +37,15 @@ $ terraform apply
   (`anumati add …`) and a logged reason, so you extend coverage from what you
   actually run.
 - **Bash-only by design.** anumati vets `Bash` — the hard problem. `Read` /
-  `Write` / `Edit` stay with Claude Code's own permission flow.
+  `Write` / `Edit` stay with the agent's own permission flow.
 
 ## How it works
 
-Every time Claude Code is about to run a **Bash** command, the hook checks it
+Every time the agent is about to run a **Bash** command, anumati checks it
 against your allow rules:
 
 1. **A rule matches** → auto-approved, no prompt.
-2. **No rule matches** → Claude Code shows its normal permission dialog, and
+2. **No rule matches** → the agent shows its normal permission prompt, and
    anumati prints a 💡 suggestion for allowing it next time.
 
 A command is approved one of two ways: a single matcher accepts the whole thing,
@@ -64,8 +67,9 @@ A disallowed sub-command always fails its own check, so chaining a bad command
 onto a good one can't sneak it through. Pipes are never split across rules (a
 pipe feeds data into the next command, so only the matcher owning the pipeline
 can judge it). Configs cascade: a project config at
-`<cwd>/.claude/permissions.json` is checked before your global
-`~/.claude/permissions.json`.
+`<cwd>/.anumati/permissions.json` is checked before your global
+`~/.anumati/permissions.json` (the legacy `~/.claude/` locations are still
+honored, so existing setups keep working).
 
 The full model — matchers, composition rules, and safety guarantees — is in
 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
@@ -91,7 +95,8 @@ One command sets up everything:
 anumati init
 ```
 
-It prompts for **project** (this folder) or **root** (global) scope, then:
+It prompts for **which agent(s)** (Claude Code / Codex / both) and **project**
+(this folder) or **root** (global) scope, then:
 
 1. **Writes a starter config** of broadly-useful, low-risk rules — read-only
    inspection, git reads, `cd`/`sleep`/`echo`/`sed`/`jq`, `npx tsc`, `cargo`,
@@ -102,15 +107,17 @@ It prompts for **project** (this folder) or **root** (global) scope, then:
    approve nothing until you fill them in, so you can see the matcher exists and
    which key to populate (`anumati add <matcher> …`) without hunting the docs.
 2. **Scaffolds an audit log** next to the config.
-3. **Registers the PreToolUse hook** in the sibling `settings.json` (merged
-   non-destructively into any existing hooks).
-4. **Adds a SessionStart banner** so you can see anumati is active.
+3. **Wires the chosen agent(s)**, merged non-destructively — Claude Code's
+   `PreToolUse` hook in `settings.json`, and/or Codex's `PermissionRequest` hook
+   in `~/.codex/hooks.json`.
+4. **Adds a SessionStart banner** ("⚡ anumati active") so you can see it's on.
 5. **Writes command-style guidance** to the sibling `CLAUDE.md`, nudging the
    agent to emit approvable commands.
 
-**Restart Claude Code (or run `/hooks`)** for it to take effect. Then just work
-— routine commands stop prompting, and when something new falls through you'll
-see a `💡 anumati add …` suggestion.
+**Reload the agent** for it to take effect (Claude Code: `/hooks` or restart;
+Codex: approve the anumati hook once when it prompts to review it). Then just
+work — routine commands stop prompting, and when something new falls through
+you'll see a `💡 anumati add …` suggestion.
 
 Grow your config as you go:
 
@@ -125,6 +132,9 @@ anumati apply --all                         # apply accumulated suggestions
 
 - **[Configuration reference](docs/CONFIGURATION.md)** — every matcher, rule
   field, audit/sound/debug option, and CLI subcommand.
+- **[Claude Code + Codex](docs/MULTI-AGENT.md)** — running anumati across both
+  agents from one shared config: per-agent wiring, the Codex integration, and
+  `anumati migrate`.
 - **[Command-style guide](docs/COMMAND-STYLE.md)** — how to write commands that
   land on the auto-approve path (also installed into `CLAUDE.md` by `init`).
 
