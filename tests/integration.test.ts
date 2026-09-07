@@ -293,7 +293,7 @@ describe("cli — init", () => {
     expect(res.stdout).toContain("root (global)");
   });
 
-  it("--project creates a config under the cwd's .claude/", () => {
+  it("--project creates a config under the cwd's .anumati/", () => {
     // spawnSync runs in ROOT by default; set cwd to the temp dir via a child cwd.
     const res = spawnSync("node", [BIN, "init", "--project"], {
       input: "",
@@ -302,7 +302,8 @@ describe("cli — init", () => {
       env: { ...process.env, HOME: join(dir, "fakehome") },
     });
     expect(res.status).toBe(0);
-    expect(existsSync(join(dir, ".claude", "permissions.json"))).toBe(true);
+    // Fresh project (neither .anumati nor legacy .claude present) → new home.
+    expect(existsSync(join(dir, ".anumati", "permissions.json"))).toBe(true);
   });
 
   it("errors (does not hang) when no level is given on a non-interactive stdin", () => {

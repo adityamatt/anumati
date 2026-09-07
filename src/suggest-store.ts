@@ -1,15 +1,18 @@
 import { appendFileSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import type { Suggestion } from "./suggest.js";
+import { resolvePreferred, anumatiHome, legacyHome } from "./config.js";
 
 export interface StoredSuggestion extends Suggestion {
   ts: string;
 }
 
-/** Default location for accumulated suggestions. */
+/** Default location for accumulated suggestions — ~/.anumati/, legacy ~/.claude/. */
 export function defaultSuggestionsFile(): string {
-  return join(homedir(), ".claude", "anumati-suggestions.jsonl");
+  return resolvePreferred([
+    join(anumatiHome(), "anumati-suggestions.jsonl"),
+    join(legacyHome(), "anumati-suggestions.jsonl"),
+  ]);
 }
 
 /** Append a suggestion as one JSON line. Never throws — storage must not block the hook. */

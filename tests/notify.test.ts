@@ -1,5 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { resolveSoundCommand, isSoundEnabled, playSound } from "../src/notify.js";
+import {
+  resolveSoundCommand,
+  isSoundEnabled,
+  playSound,
+  resolveNotifyConfig,
+} from "../src/notify.js";
+
+describe("resolveNotifyConfig", () => {
+  it("merges project over root field-by-field", () => {
+    const project = { notify: { sound: false } };
+    const root = { notify: { sound: true, sound_command: ["afplay", "/x.aiff"] } };
+    expect(resolveNotifyConfig(project, root)).toEqual({
+      sound: false, // project wins
+      sound_command: ["afplay", "/x.aiff"], // falls back to root
+    });
+  });
+
+  it("returns empty fields when neither config sets notify", () => {
+    expect(resolveNotifyConfig(null, null)).toEqual({ sound: undefined, sound_command: undefined });
+  });
+});
 
 describe("isSoundEnabled", () => {
   it("defaults to enabled when notify is absent", () => {

@@ -41,12 +41,12 @@
  */
 
 const { readFileSync, writeFileSync } = require("fs");
-const { homedir } = require("os");
 const { join } = require("path");
 
 const { evaluate } = require("../dist/matcher");
 const { suggest } = require("../dist/suggest");
 const { debugDiagnose } = require("../dist/debug");
+const { defaultConfigPath, resolvePreferred, anumatiHome, legacyHome } = require("../dist/config");
 
 // ── Classification tables ─────────────────────────────────────────────────────
 
@@ -114,8 +114,11 @@ function loadConfig(path) {
 
 const argv = process.argv.slice(2);
 const opts = {
-  log: join(homedir(), ".claude", "anumati-passthrough.jsonl"),
-  config: join(homedir(), ".claude", "permissions.json"),
+  log: resolvePreferred([
+    join(anumatiHome(), "anumati-passthrough.jsonl"),
+    join(legacyHome(), "anumati-passthrough.jsonl"),
+  ]),
+  config: defaultConfigPath(),
   cwd: process.cwd(),
   out: "triage-report.md",
   json: "triage-result.json",

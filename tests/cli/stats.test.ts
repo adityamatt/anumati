@@ -26,6 +26,10 @@ function line(tool: string, decision: string): string {
   return JSON.stringify({ ts: "t", tool, decision }) + "\n";
 }
 
+function lineH(tool: string, decision: string, host: string): string {
+  return JSON.stringify({ ts: "t", tool, decision, host }) + "\n";
+}
+
 function twoFileConfig(): Config {
   return { audit: { audit_file: auditPath(), passthrough_file: passPath() } };
 }
@@ -76,6 +80,40 @@ describe("computeStats — legacy single-file setup", () => {
     expect(s.allowed).toBe(2);
     expect(s.passthrough).toBe(1);
     expect(s.sources).toEqual([auditPath()]);
+  });
+});
+
+describe("computeStats — by host", () => {
+  it("splits by host and defaults a missing host to claude", () => {
+    writeFileSync(
+      auditPath(),
+      lineH("Bash", "allow", "claude") + lineH("Bash", "allow", "codex") + line("Bash", "allow"),
+    );
+    writeFileSync(passPath(), lineH("Bash", "passthrough", "codex"));
+    const s = computeStats(twoFileConfig());
+    // combined unchanged
+    expect(s.allowed).toBe(3);
+    expect(s.passthrough).toBe(1);
+    // per host (the untagged allow counts as claude)
+    expect(s.byHost.claude).toEqual({ allowed: 2, passthrough: 0, total: 2 });
+    expect(s.byHost.codex).toEqual({ allowed: 1, passthrough: 1, total: 2 });
+  });
+});
+
+describe("formatStats — by host", () => {
+  it("shows a `By host` section when more than one host has activity", () => {
+    writeFileSync(auditPath(), lineH("Bash", "allow", "claude") + lineH("Bash", "allow", "codex"));
+    const out = formatStats(computeStats(twoFileConfig()), "/x/permissions.json");
+    expect(out).toContain("By host:");
+    expect(out).toContain("claude");
+    expect(out).toContain("codex");
+  });
+
+  it("shows the `By host` section even for a single host (all claude)", () => {
+    writeFileSync(auditPath(), line("Bash", "allow") + line("Bash", "allow"));
+    const out = formatStats(computeStats(twoFileConfig()), "/x/permissions.json");
+    expect(out).toContain("By host:");
+    expect(out).toContain("claude"); // untagged entries default to claude
   });
 });
 

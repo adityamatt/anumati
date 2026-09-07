@@ -1,5 +1,18 @@
 import { spawn } from "child_process";
-import type { NotifyConfig } from "./types.js";
+import type { Config, NotifyConfig } from "./types.js";
+
+/** Merge notify config across configs; project overrides root field-by-field. */
+export function resolveNotifyConfig(
+  projectConfig: Config | null,
+  rootConfig: Config | null,
+): NotifyConfig {
+  const root = rootConfig?.notify ?? {};
+  const project = projectConfig?.notify ?? {};
+  return {
+    sound: project.sound ?? root.sound,
+    sound_command: project.sound_command ?? root.sound_command,
+  };
+}
 
 // Per-platform default sound command. Each is a best-effort, widely-available
 // player invoked on a short, built-in system sound. If the binary is missing

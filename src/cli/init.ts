@@ -15,6 +15,7 @@ import {
   type WireResult,
 } from "./settings.js";
 import { claudeMdFileFor, wireSteerFile, type SteerResult } from "./steer.js";
+import { planCodexSetup, printCodexSetup } from "./codex-setup.js";
 
 // Starter rules a fresh user gets. Two kinds of entry:
 //
@@ -145,9 +146,14 @@ export function starterConfig(auditFile?: string, debug = false, passthroughFile
 
 export type InitLevel = "root" | "project";
 
+// Which agent(s) to wire. The shared ruleset is written once regardless; only the
+// per-host wiring differs (Claude settings.json vs the Codex config.toml snippet).
+export type InitHost = "claude" | "codex" | "both";
+
 export interface InitOptions {
   config?: string; // explicit path override (wins over level)
   level?: InitLevel;
+  host?: InitHost; // which agent(s) to wire (default: claude)
   cwd?: string; // for resolving the project path; defaults to process.cwd()
   force?: boolean;
   audit?: boolean; // scaffold an audit block + log file (default: true)
@@ -294,6 +300,12 @@ export function parseInitArgs(args: string[]): InitOptions {
       opts.steer = false;
     } else if (arg === "--debug") {
       opts.debug = true;
+    } else if (arg === "--host") {
+      const value = args[++i];
+      if (value !== "claude" && value !== "codex" && value !== "both") {
+        throw new Error("--host must be one of: claude, codex, both");
+      }
+      opts.host = value;
     } else if (arg === "--config") {
       const value = args[++i];
       if (value === undefined || value.startsWith("--")) {
@@ -334,6 +346,31 @@ async function promptForTarget(cwd: string): Promise<string | null> {
 
     if (answer === "p" || answer === "project") return projectConfigPath(cwd);
     if (answer === "r" || answer === "root") return defaultConfigPath();
+    return null; // q / anything else → cancel
+  } finally {
+    rl.close();
+  }
+}
+
+// Prompt for which agent(s) to wire. Returns null on cancel.
+async function promptForHost(): Promise<InitHost | null> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (
+      await rl.question(
+        "Which agent(s) do you want to set up anumati for?\n" +
+          "  [c] Claude Code\n" +
+          "  [x] Codex\n" +
+          "  [b] both\n" +
+          "  [q] cancel\n> ",
+      )
+    )
+      .trim()
+      .toLowerCase();
+
+    if (answer === "c" || answer === "claude") return "claude";
+    if (answer === "x" || answer === "codex") return "codex";
+    if (answer === "b" || answer === "both") return "both";
     return null; // q / anything else → cancel
   } finally {
     rl.close();
@@ -397,7 +434,7 @@ function printResult(result: InitResult): void {
   console.log(`\nAdd more rules as you go, e.g. \`anumati add curl --domain api.github.com\`.`);
 }
 
-/** CLI entrypoint: `anumati init [--root|--project] [--config <path>] [--force]` */
+/** CLI entrypoint: `anumati init [--host claude|codex|both] [--root|--project] [--config <path>] [--force]` */
 export async function runInit(argv: string[]): Promise<void> {
   const args = argv.slice(1); // drop the "init" token
   let opts: InitOptions;
@@ -413,8 +450,24 @@ export async function runInit(argv: string[]): Promise<void> {
   // Always show where configs already exist so the choice is informed.
   printStatus(cwd);
 
-  let target = resolveInitTarget({ ...opts, cwd });
+  // Which agent(s)? Prompt interactively; default to Claude non-interactively so
+  // existing scripted `anumati init` invocations behave exactly as before.
+  let host: InitHost;
+  if (opts.host) {
+    host = opts.host;
+  } else if (process.stdin.isTTY) {
+    const chosen = await promptForHost();
+    if (!chosen) {
+      console.log("Cancelled. Nothing set up.");
+      return;
+    }
+    host = chosen;
+  } else {
+    host = "claude";
+  }
 
+  // Where the shared ruleset lives (root or project). Same choice for every host.
+  let target = resolveInitTarget({ ...opts, cwd });
   if (!target) {
     if (!process.stdin.isTTY) {
       console.error(
@@ -429,28 +482,49 @@ export async function runInit(argv: string[]): Promise<void> {
     }
   }
 
-  // Handle an existing target: honor --force, otherwise prompt in a TTY, else error.
-  if (existsSync(target) && !opts.force) {
-    if (process.stdin.isTTY) {
-      const ok = await promptOverwrite(target);
-      if (!ok) {
-        console.log("Cancelled. Existing config left unchanged.");
-        return;
+  const argv1 = opts.argv1 ?? process.argv[1] ?? "anumati";
+  const execPath = opts.execPath ?? process.execPath;
+
+  // Claude wiring goes through applyInit (writes the ruleset + settings.json hook
+  // + banner + CLAUDE.md). Codex-only skips this — planCodexSetup writes the
+  // ruleset itself and never overwrites, so it needs no --force handling.
+  if (host === "claude" || host === "both") {
+    if (existsSync(target) && !opts.force) {
+      if (process.stdin.isTTY) {
+        const ok = await promptOverwrite(target);
+        if (!ok) {
+          console.log("Cancelled. Existing config left unchanged.");
+          return;
+        }
+        opts.force = true;
+      } else {
+        console.error(
+          `✗ ${prettyPath(target)} already exists. Use --force to overwrite, or edit it directly / use \`anumati add\`.`,
+        );
+        process.exit(1);
       }
-      opts.force = true;
-    } else {
-      console.error(
-        `✗ ${prettyPath(target)} already exists. Use --force to overwrite, or edit it directly / use \`anumati add\`.`,
-      );
+    }
+    try {
+      const result = applyInit({ ...opts, config: target });
+      printResult(result);
+    } catch (err) {
+      console.error(`✗ ${(err as Error).message}`);
       process.exit(1);
     }
   }
 
-  try {
-    const result = applyInit({ ...opts, config: target });
-    printResult(result);
-  } catch (err) {
-    console.error(`✗ ${(err as Error).message}`);
-    process.exit(1);
+  // Codex wiring: ensure the (shared) ruleset exists, then print the config.toml
+  // snippet + trust guidance. For "both", the ruleset was just written above, so
+  // this reuses it without rewriting.
+  if (host === "codex" || host === "both") {
+    if (host === "both") console.log(); // visual separation from the Claude section
+    console.log("── Codex setup ──");
+    try {
+      const result = planCodexSetup({ config: target, argv1, execPath, debug: opts.debug });
+      printCodexSetup(result);
+    } catch (err) {
+      console.error(`✗ ${(err as Error).message}`);
+      process.exit(1);
+    }
   }
 }

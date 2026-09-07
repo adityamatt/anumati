@@ -24,10 +24,14 @@ function writeEntry(
   input: HookInput,
   result: MatchResult,
   note?: DebugNote | null,
+  host?: string,
 ): void {
   const entry: Record<string, unknown> = {
     ts: localISOString(new Date()),
     tool: input.tool_name,
+    // Which agent produced this entry ("claude" | "codex"). Omitted when unknown;
+    // `anumati stats` defaults a missing host to "claude" (pre-tag logs).
+    host,
     command: input.tool_input.command,
     file_path: input.tool_input.file_path,
     decision: result.decision ?? "passthrough",
@@ -54,6 +58,7 @@ export function audit(
   input: HookInput,
   result: MatchResult,
   note?: DebugNote | null,
+  host?: string,
 ): void {
   const level = config?.audit_level ?? "matched";
   if (level === "off") return;
@@ -66,10 +71,10 @@ export function audit(
     // otherwise fall back to audit_file only when level is "all" (legacy behavior
     // where approvals and passthroughs share one file).
     const target = passthroughFile ?? (level === "all" ? auditFile : undefined);
-    if (target) writeEntry(target, input, result, note);
+    if (target) writeEntry(target, input, result, note, host);
     return;
   }
 
   // Approved call — always logged (for both "matched" and "all") to audit_file.
-  if (auditFile) writeEntry(auditFile, input, result);
+  if (auditFile) writeEntry(auditFile, input, result, undefined, host);
 }

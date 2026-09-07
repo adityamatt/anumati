@@ -1,8 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { homedir } from "os";
 import { dirname, join } from "path";
 import type { Config, HookInput, Rule } from "../types.js";
-import { defaultConfigPath } from "../config.js";
+import { defaultConfigPath, resolvePreferred, anumatiHome, legacyHome } from "../config.js";
 import { evaluate } from "../matcher.js";
 import { suggest } from "../suggest.js";
 import { MATCHERS, type MatcherInfo } from "../matchers/registry.js";
@@ -45,7 +44,10 @@ export interface ScaffoldResult {
 function defaultPassthroughLog(config: Config | null): string {
   return (
     config?.audit?.passthrough_file ??
-    join(homedir(), ".claude", "anumati-passthrough.jsonl")
+    resolvePreferred([
+      join(anumatiHome(), "anumati-passthrough.jsonl"),
+      join(legacyHome(), "anumati-passthrough.jsonl"),
+    ])
   );
 }
 

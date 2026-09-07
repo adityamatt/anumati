@@ -74,6 +74,17 @@ describe("parseInitArgs", () => {
     expect(parseInitArgs(["--no-steer"]).steer).toBe(false);
     expect(parseInitArgs([]).steer).toBeUndefined(); // defaults on at apply time
   });
+
+  it("parses --host claude|codex|both", () => {
+    expect(parseInitArgs(["--host", "claude"]).host).toBe("claude");
+    expect(parseInitArgs(["--host", "codex"]).host).toBe("codex");
+    expect(parseInitArgs(["--host", "both"]).host).toBe("both");
+    expect(parseInitArgs([]).host).toBeUndefined(); // defaults to claude at runtime
+  });
+
+  it("throws on an invalid --host value", () => {
+    expect(() => parseInitArgs(["--host", "gemini"])).toThrow(/claude, codex, both/);
+  });
 });
 
 describe("resolveInitTarget", () => {
@@ -98,7 +109,7 @@ describe("resolveInitTarget", () => {
 
 describe("configStatus", () => {
   it("reports a project config as existing once created", () => {
-    // Create a project config under the temp dir via applyInit (makes .claude/).
+    // Create a project config under the temp dir via applyInit (makes .anumati/).
     const projConfig = projectConfigPath(dir);
     applyInit({ config: projConfig, level: "project" });
     const status = configStatus(dir);

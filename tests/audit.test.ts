@@ -55,6 +55,23 @@ describe("audit — level: matched", () => {
   });
 });
 
+describe("audit — host tag", () => {
+  it("stamps the host on an entry when provided", () => {
+    audit({ audit_file: TMP, audit_level: "matched" }, bashInput, allowResult, undefined, "codex");
+    expect(lines()[0].host).toBe("codex");
+  });
+
+  it("stamps the host on a passthrough entry too", () => {
+    audit({ audit_file: TMP, audit_level: "all" }, bashInput, passthroughResult, null, "claude");
+    expect(lines()[0].host).toBe("claude");
+  });
+
+  it("omits host when not provided (legacy)", () => {
+    audit({ audit_file: TMP, audit_level: "matched" }, bashInput, allowResult);
+    expect(lines()[0].host).toBeUndefined();
+  });
+});
+
 describe("audit — level: all", () => {
   it("logs passthrough too", () => {
     audit({ audit_file: TMP, audit_level: "all" }, bashInput, passthroughResult);

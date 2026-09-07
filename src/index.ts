@@ -9,7 +9,7 @@ import {
   loadConfig,
 } from "./config.js";
 import { suggest } from "./suggest.js";
-import { playSound } from "./notify.js";
+import { playSound, resolveNotifyConfig } from "./notify.js";
 import { debugDiagnose, formatDebugNote } from "./debug.js";
 import {
   storeSuggestion,
@@ -18,7 +18,10 @@ import {
 import { runInit } from "./cli/init.js";
 import { runAdd } from "./cli/add.js";
 import { runScaffold } from "./cli/scaffold.js";
+import { runCodexHook } from "./cli/codex-hook.js";
+import { runCodexSetup } from "./cli/codex-setup.js";
 import { runUpdate } from "./cli/update.js";
+import { runMigrate } from "./cli/migrate.js";
 import { runApply } from "./cli/apply.js";
 import { runDebug } from "./cli/debug.js";
 import { runStats } from "./cli/stats.js";
@@ -27,7 +30,6 @@ import type {
   Config,
   HookInput,
   MatchResult,
-  NotifyConfig,
   Rule,
   SuggestConfig,
 } from "./types.js";
@@ -77,19 +79,6 @@ function resolveSuggestConfig(
   };
 }
 
-// Merge notify config across configs; project overrides root field-by-field.
-function resolveNotifyConfig(
-  projectConfig: Config | null,
-  rootConfig: Config | null,
-): NotifyConfig {
-  const root = rootConfig?.notify ?? {};
-  const project = projectConfig?.notify ?? {};
-  return {
-    sound: project.sound ?? root.sound,
-    sound_command: project.sound_command ?? root.sound_command,
-  };
-}
-
 function runHook(): void {
   let input: HookInput;
   try {
@@ -129,12 +118,13 @@ function runHook(): void {
         ...(rootConfig?.allow ?? []),
       ]);
 
-  // Audit each config independently; root only audited when actually consulted
+  // Audit each config independently; root only audited when actually consulted.
+  // Tag entries with the host so `anumati stats` can break down by agent.
   if (projectConfig) {
-    audit(projectConfig.audit, input, projectResult, passthroughNote);
+    audit(projectConfig.audit, input, projectResult, passthroughNote, "claude");
   }
   if (rootConfig && projectResult.decision !== "allow") {
-    audit(rootConfig.audit, input, rootResult, passthroughNote);
+    audit(rootConfig.audit, input, rootResult, passthroughNote, "claude");
   }
 
   if (approved) {
@@ -250,6 +240,15 @@ Usage:
                                    anumati@latest). --check reports whether a newer version
                                    exists without installing. The hook picks up the new
                                    version on its next command — no restart needed.
+  anumati codex-hook [config]      OpenAI Codex adapter: run as a Codex PermissionRequest
+                                   command hook (reads the request JSON on stdin, auto-approves
+                                   the safe subset from the same config). --debug dumps the raw
+                                   payload to ~/.anumati/codex-hook-debug.jsonl.
+  anumati codex-setup [config]     Wire anumati into Codex: ensure the shared ruleset exists and
+                                   auto-write ~/.codex/hooks.json (+ a one-time trust reminder).
+  anumati migrate                  Relocate ~/.claude/permissions.json → ~/.anumati/permissions.json
+                                   and symlink the old path (existing hooks keep working). Idempotent;
+                                   works on any install (global or local sync).
   anumati debug <on|off>           Toggle debug mode (explains why passthroughs weren't approved).
                                    Targets the root config; --project / --config <path> to retarget.
   anumati stats                    Show auto-approved vs passed-through counts and ratio for Bash
@@ -298,6 +297,19 @@ function main(): void {
   }
   if (subcommand === "update") {
     runUpdate(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "codex-hook") {
+    // OpenAI Codex PermissionRequest adapter — reads the payload on stdin.
+    runCodexHook(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "codex-setup") {
+    runCodexSetup(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "migrate") {
+    runMigrate(process.argv.slice(2));
     return;
   }
   if (subcommand === "debug") {

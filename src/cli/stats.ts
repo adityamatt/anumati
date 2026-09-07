@@ -9,6 +9,12 @@ export interface StatsCmdOptions {
   cwd?: string;
 }
 
+export interface HostStats {
+  allowed: number;
+  passthrough: number;
+  total: number;
+}
+
 export interface Stats {
   allowed: number;
   passthrough: number;
@@ -17,12 +23,18 @@ export interface Stats {
   ratio: number;
   /** files actually read (deduped, existing). */
   sources: string[];
+  /** Per-host breakdown; a missing `host` on an entry counts as "claude". */
+  byHost: Record<string, HostStats>;
 }
 
 interface Entry {
   tool?: string;
   decision?: string;
+  host?: string;
 }
+
+// Missing host = a pre-tag (legacy) entry, which only the Claude hook wrote.
+const DEFAULT_HOST = "claude";
 
 function resolveTarget(opts: StatsCmdOptions): string {
   if (opts.config) return opts.config;
@@ -49,6 +61,14 @@ export function computeStats(config: Config): Stats {
   let allowed = 0;
   let passthrough = 0;
   const sources: string[] = [];
+  const byHost: Record<string, HostStats> = {};
+
+  const bump = (host: string, isAllow: boolean) => {
+    const hs = (byHost[host] ??= { allowed: 0, passthrough: 0, total: 0 });
+    if (isAllow) hs.allowed++;
+    else hs.passthrough++;
+    hs.total++;
+  };
 
   for (const file of statsSources(config)) {
     if (!existsSync(file)) continue;
@@ -69,8 +89,10 @@ export function computeStats(config: Config): Stats {
         continue; // skip malformed line
       }
       if (entry.tool !== "Bash") continue;
-      if (entry.decision === "allow") allowed++;
+      const isAllow = entry.decision === "allow";
+      if (isAllow) allowed++;
       else passthrough++;
+      bump(entry.host ?? DEFAULT_HOST, isAllow);
     }
   }
 
@@ -82,6 +104,7 @@ export function computeStats(config: Config): Stats {
     total,
     ratio: total === 0 ? 0 : allowed / total,
     sources,
+    byHost,
   };
 }
 
@@ -117,6 +140,22 @@ export function formatStats(stats: Stats, configPath: string): string {
   lines.push(`  Total         : ${String(stats.total).padStart(6)}`);
   lines.push("");
   lines.push(`  approve rate  ${bar(stats.ratio)} ${pct(stats.ratio)}`);
+
+  // Per-host breakdown, always shown alongside the combined totals (even when a
+  // single host — e.g. all Claude — has all the activity).
+  const hosts = Object.keys(stats.byHost).sort();
+  if (hosts.length > 0) {
+    lines.push("");
+    lines.push("  By host:");
+    for (const host of hosts) {
+      const hs = stats.byHost[host];
+      const r = hs.total === 0 ? 0 : hs.allowed / hs.total;
+      lines.push(
+        `    ${host.padEnd(7)} ${String(hs.allowed).padStart(5)} allowed · ` +
+          `${String(hs.passthrough).padStart(5)} passed  (${pct(r)})`,
+      );
+    }
+  }
 
   return lines.join("\n");
 }
