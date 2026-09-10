@@ -122,11 +122,19 @@ you'll see a `💡 anumati add …` suggestion.
 Grow your config as you go:
 
 ```bash
+anumati review                              # turn your passthrough log into config changes, interactively
 anumati add curl --domain api.github.com   # allow curl to a domain
 anumati add git-write --git-ops add,commit  # allow specific git writes
 anumati stats                               # see your auto-approve rate
 anumati apply --all                         # apply accumulated suggestions
 ```
+
+`anumati review` is the quickest way to close the gap: it reads your passthrough
+log, shows the exact rule that would auto-approve each fall-through command (and
+how many commands each covers), and applies the ones you pick — so you don't
+have to hand-write `anumati add` incantations. It only ever proposes changes
+anumati itself verified, and re-runs with `--all` to apply everything or
+`--dry-run` to just preview.
 
 ## Docs
 

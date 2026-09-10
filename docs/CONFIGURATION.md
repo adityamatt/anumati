@@ -361,6 +361,80 @@ anumati apply --all      # apply all of them, then clear
 anumati apply --clear    # discard without applying
 ```
 
+### `anumati review`
+
+Turn your passthrough log into config changes, interactively. Where `apply`
+replays the accumulated **suggestions store**, `review` reads the **passthrough
+log** directly and re-derives, for every fall-through command, the exact rule
+that would auto-approve it — then lets you apply the ones you choose.
+
+```bash
+anumati review              # interactive: shows each proposed change, prompts per one
+anumati review --all        # apply every proposal without prompting (alias: -y)
+anumati review --dry-run    # print the plan and exit; never writes
+anumati review --project    # target <cwd>/.anumati/permissions.json (default: root)
+anumati review --config <path>   # target a specific config
+anumati review --log <path>      # analyze a specific passthrough log
+```
+
+For each distinct logged command it runs anumati's own `evaluate()` /
+`suggest()` engine (the same the live hook uses), then groups the answers per
+matcher into applyable proposals:
+
+```
+anumati review — ~/.anumati/permissions.json
+
+  passthrough log : ~/.anumati/anumati-passthrough.jsonl
+  1004 passthrough(s) · 941 distinct · 93 already auto-approve
+
+  2 change(s) would auto-approve more:
+
+  1. curl · extend rule · covers 23 (27×)
+       + domains  api.github.com, raw.githubusercontent.com
+       e.g. curl -s "https://api.github.com/repos/openai/codex/contents/…" | grep …
+       apply: anumati add curl --domain api.github.com,raw.githubusercontent.com
+
+  2. python3-pipe · extend rule · covers 1
+       + paths    /Users/you/.claude/projects/…/tool-results/
+       e.g. python3 -c "import json,sys; d=json.load(open('/Users/you/…
+
+  824 command(s) can't be auto-approved — no config change helps:
+        545×  no matcher for "git"
+        168×  uses shell substitution ($(…) or backticks)
+         52×  dangerous command "gh"
+```
+
+It both **extends an existing rule's allowlist** (a near-miss, e.g. adding a
+`curl` domain — which `scaffold` can't do) and **enables a new matcher**.
+Interactive answers per proposal are `[y]es` / `[N]o` / `[a]ll` (this and every
+remaining) / `[q]uit`; the default on Enter is **no** — widening approval is
+always an explicit choice. (The `apply:` line is shown in `--dry-run` and
+non-interactive runs for copy-paste; interactively you just answer the prompt.)
+
+Long or multi-line commands are collapsed to a single line and truncated in the
+illustrative `e.g.` line — the values you actually consent to (domains, paths,
+…) are always shown in full. The un-approvable list is grouped by leading
+command (`no matcher for "git"`) with counts, so you can see what's uncovered
+without a wall of commands.
+
+**Safe by construction.** Every proposal is one `suggest()` verified by re-running
+the real matcher, and every write goes through the same `anumati add` code path,
+so `review` can only ever apply changes anumati itself validated — it never
+judges safety on its own. Commands no config change can cover (destructive
+shapes, `$(…)`, file redirects, an uncovered leading command) are listed
+separately with the reason, never proposed.
+
+After applying, `review` re-evaluates the affected commands and reports how many
+now auto-approve, so the effect is verified, not assumed.
+
+**Non-interactive (piped / CI / inside an agent):** with no TTY and no `--all`,
+`review` prints the plan and exits **without writing** — re-run with `--all` (or
+`-y`) to apply. It never modifies your config silently.
+
+The log doesn't record a cwd, so `review` replays commands under the current
+directory; a wrong cwd only ever *under*-proposes (the `cd` / `python3-pipe` /
+`node-script` matchers are cwd-relative), never over-approves.
+
 ### `anumati debug`
 
 Toggle debug mode (explanations for why a passthrough wasn't approved) without

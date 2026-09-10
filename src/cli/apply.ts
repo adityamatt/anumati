@@ -14,24 +14,29 @@ export function deduplicateByCommand(
   return [...byCommand.values()];
 }
 
-// Map a suggestion's structured configDelta to add options. We deliberately do
-// NOT re-tokenize the human-readable `command` string — doing so would mangle
-// any value containing whitespace (e.g. a path with a space), which could write
-// a truncated, over-broad rule. The configDelta is the source of truth.
-function suggestionToAddOptions(
-  s: StoredSuggestion,
+// Map a suggestion's structured `configDelta` to `anumati add` options. We
+// deliberately do NOT re-tokenize the human-readable `command` string — doing so
+// would mangle any value containing whitespace (e.g. a path with a space), which
+// could write a truncated, over-broad rule. The configDelta is the source of
+// truth. Every allowlist field a suggestion can carry is mapped here, so a
+// nodejs-pipe suggestion's `allowed_modules` is applied like any other. Shared by
+// `anumati apply` and `anumati review`.
+export function configDeltaToAddOptions(
+  matcher: string,
+  delta: Record<string, unknown> | undefined,
   config?: string,
 ): AddOptions {
-  const d = (s.configDelta ?? {}) as Record<string, unknown>;
+  const d = delta ?? {};
   const open = d.open as { allowed_paths?: unknown } | undefined;
   const asStrings = (v: unknown): string[] | undefined =>
     Array.isArray(v) ? (v.filter((x) => typeof x === "string") as string[]) : undefined;
 
   return {
-    matcher: s.matcher,
+    matcher,
     config,
     domains: asStrings(d.allowed_domains),
     imports: asStrings(d.allowed_imports),
+    modules: asStrings(d.allowed_modules),
     packages: asStrings(d.allowed_packages),
     scripts: asStrings(d.allowed_scripts),
     repos: asStrings(d.allowed_repos),
@@ -45,7 +50,7 @@ export function applyOneSuggestion(
   config?: string,
 ): AddResult | null {
   if (!s.matcher) return null;
-  return applyAdd(suggestionToAddOptions(s, config));
+  return applyAdd(configDeltaToAddOptions(s.matcher, s.configDelta, config));
 }
 
 /** CLI entrypoint: `anumati apply [--all] [--clear] [--config /path]` */

@@ -23,6 +23,7 @@ import { runCodexSetup } from "./cli/codex-setup.js";
 import { runUpdate } from "./cli/update.js";
 import { runMigrate } from "./cli/migrate.js";
 import { runApply } from "./cli/apply.js";
+import { runReview } from "./cli/review.js";
 import { runDebug } from "./cli/debug.js";
 import { runStats } from "./cli/stats.js";
 import { runSessionStart } from "./cli/session-start.js";
@@ -236,6 +237,13 @@ Usage:
                                    Flags: --config P, --log P (passthrough log to
                                    analyze), --no-log (skip coverage counts).
   anumati apply [--all|--clear]    Review accumulated suggestions; apply or discard them.
+  anumati review [--all|--dry-run] Turn your passthrough log into config changes: for every
+                                   fall-through command, show the exact rule that would
+                                   auto-approve it (how many commands each covers), then apply
+                                   the ones you choose. Interactive by default (per-change y/N/a/q);
+                                   --all (or -y) applies every proposal, --dry-run just prints.
+                                   Targets the root config; --project / --config to retarget;
+                                   --log P to analyze a specific passthrough log.
   anumati update [--check]         Update to the latest published version (npm install -g
                                    anumati@latest). --check reports whether a newer version
                                    exists without installing. The hook picks up the new
@@ -293,6 +301,13 @@ function main(): void {
   }
   if (subcommand === "apply") {
     runApply(process.argv.slice(2));
+    return;
+  }
+  if (subcommand === "review") {
+    runReview(process.argv.slice(2)).catch((err) => {
+      console.error(`✗ ${(err as Error).message}`);
+      process.exit(1);
+    });
     return;
   }
   if (subcommand === "update") {

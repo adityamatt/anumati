@@ -28,6 +28,10 @@ stdin (JSON from Claude Code)
               src/suggest-store.ts  append/read/clear ~/.claude/anumati-suggestions.jsonl
               src/cli/add.ts        applyAdd() — merge/create a rule in permissions.json
               src/cli/apply.ts      list/dedupe/apply accumulated suggestions
+                                    (configDeltaToAddOptions — shared delta→AddOptions mapper)
+              src/cli/review.ts     analyzeReview() reads the passthrough LOG, re-runs
+                                    evaluate()/suggest() per command, groups proposals per
+                                    matcher; applyProposals() writes via applyAdd + verifies
 ```
 
 ## Key types
@@ -92,6 +96,12 @@ anumati add <matcher> [--domain/--imports/--modules/--packages/--scripts/--repos
 anumati scaffold [--config P] [--log P] [--no-log]   # add every catalog matcher not yet present as a DISABLED
                                 # placeholder; annotates each with how many passthrough-log commands it would cover
 anumati apply [--all|--clear] [--config P]
+anumati review [--all|-y|--dry-run] [--config P] [--project|--root] [--log P]
+                                # read the passthrough LOG, re-derive per-command suggestions via
+                                # evaluate()/suggest(), group them per matcher into applyable proposals,
+                                # and (interactively, or with --all) write them through applyAdd. Reports
+                                # how many previously-passthrough commands now auto-approve. Non-TTY without
+                                # --all prints the plan and exits (never writes silently).
 anumati update [--check] [--force]   # npm i -g anumati@latest when newer; --check = report only.
                                 # Guarded: refuses inside a source checkout (has src/) unless --force.
 ```

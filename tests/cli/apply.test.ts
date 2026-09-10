@@ -70,6 +70,19 @@ describe("applyOneSuggestion", () => {
     expect(cfg.allow![0].open).toEqual({ allowed_paths: ["/tmp/my file/"] });
   });
 
+  it("applies nodejs-pipe modules (regression: allowed_modules must not be dropped)", () => {
+    applyOneSuggestion(
+      stored({ matcher: "nodejs-pipe", configDelta: { allowed_modules: ["path", "util"] } }),
+      configPath,
+    );
+    const cfg: Config = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(cfg.allow![0]).toEqual({
+      tool: "Bash",
+      matcher: "nodejs-pipe",
+      allowed_modules: ["path", "util"],
+    });
+  });
+
   it("returns null when the suggestion has no matcher", () => {
     expect(applyOneSuggestion(stored({ matcher: "" as any }), configPath)).toBeNull();
   });
