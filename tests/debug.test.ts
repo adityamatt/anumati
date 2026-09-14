@@ -86,8 +86,9 @@ describe("debugDiagnose — reason codes", () => {
     expect(debugDiagnose(bash("cat $(whoami)"))?.code).toBe("shell_substitution");
   });
   it("codes a bare backgrounded command by its inner command (no rules)", () => {
-    // `&` composes: `sleep 1 &` diagnoses the stripped `sleep 1` as no_matcher.
-    expect(debugDiagnose(bash("sleep 1 &"), [])?.code).toBe("no_matcher");
+    // `&` composes: `sleep 1 &` diagnoses the stripped `sleep 1`. A sleep matcher
+    // exists but no rule is enabled, so this is matcher_not_configured, not no_matcher.
+    expect(debugDiagnose(bash("sleep 1 &"), [])?.code).toBe("matcher_not_configured");
   });
   it("codes a file redirection", () => {
     expect(debugDiagnose(bash("ls > out.txt"))?.code).toBe("file_redirection");
@@ -95,8 +96,32 @@ describe("debugDiagnose — reason codes", () => {
   it("codes a dangerous leading command", () => {
     expect(debugDiagnose(bash("bash -c whatever"))?.code).toBe("dangerous_command");
   });
-  it("codes an uncovered command", () => {
-    expect(debugDiagnose(bash("kubectl get pods"))?.code).toBe("no_matcher");
+  it("codes a truly uncovered command (no matcher exists) as no_matcher", () => {
+    const note = debugDiagnose(bash("kubectl get pods"));
+    expect(note?.code).toBe("no_matcher");
+    expect(note?.reason).toContain('No matcher covers "kubectl"');
+  });
+
+  it("codes an owned-but-unconfigured command as matcher_not_configured", () => {
+    // A git matcher family exists; with no git rule enabled, `git commit` is not
+    // 'no matcher' — it's a matcher that isn't configured to approve this form.
+    const note = debugDiagnose(bash("git commit -m x"), []);
+    expect(note?.code).toBe("matcher_not_configured");
+    expect(note?.reason).toContain("git-write");
+    expect(note?.hint).toContain("git-write");
+  });
+
+  it("still matcher_not_configured when a sibling matcher is enabled but doesn't cover this shape", () => {
+    // git-read enabled, but `git push` needs git-push — the message names the family.
+    const note = debugDiagnose(bash("git push origin main"), [{ tool: "Bash", matcher: "git-read" }]);
+    expect(note?.code).toBe("matcher_not_configured");
+    expect(note?.reason).toContain("git-push");
+  });
+
+  it("names the single owning matcher directly in the hint", () => {
+    const note = debugDiagnose(bash("mkdir -m 700 secret"), []);
+    expect(note?.code).toBe("matcher_not_configured");
+    expect(note?.hint).toContain("anumati add mkdir");
   });
 });
 
@@ -109,7 +134,7 @@ describe("debugDiagnose — composition-aware offending sub-command", () => {
   it("pinpoints the failing sub-command in a && chain", () => {
     const note = debugDiagnose(bash("git status && npm publish"), rules);
     expect(note?.offending).toBe("npm publish");
-    expect(note?.code).toBe("no_matcher");
+    expect(note?.code).toBe("matcher_not_configured");
     expect(note?.reason).toContain("npm");
   });
 

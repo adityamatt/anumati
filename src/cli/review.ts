@@ -140,6 +140,10 @@ function unapprovableGroup(code: string, command: string): { key: string; label:
     const head = leadingToken(command);
     return { key: `no_matcher:${head}`, label: `no matcher for "${head}"` };
   }
+  if (code === "matcher_not_configured") {
+    const head = leadingToken(command);
+    return { key: `matcher_not_configured:${head}`, label: `"${head}" matcher exists but no rule approves this` };
+  }
   if (code === "dangerous_command") {
     const head = leadingToken(command);
     return { key: `dangerous_command:${head}`, label: `dangerous command "${head}"` };

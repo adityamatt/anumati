@@ -110,17 +110,20 @@ describe("analyzeReview", () => {
       expect(g.label).not.toContain("console.log");
     }
     const labels = a.unapprovable.map((g) => g.label);
-    expect(labels).toContain('no matcher for "git"'); // leading command preserved
+    // git has a matcher family, so it is labeled as configured-but-unapproving,
+    // still keyed by the leading command (not the whole command).
+    expect(labels).toContain('"git" matcher exists but no rule approves this');
   });
 
   it("groups uncovered commands by leading command, not one command's name", () => {
     writeConfig({ allow: [] });
-    writeLog(["git push origin main", "git push origin dev", "npm publish"]);
+    // kubectl has no matcher (true no_matcher); git has one but no rule (configured).
+    writeLog(["kubectl get pods", "kubectl top nodes", "git push origin main"]);
 
     const a = analyze();
     const byLabel = new Map(a.unapprovable.map((g) => [g.label, g]));
-    expect(byLabel.get('no matcher for "git"')!.distinct).toBe(2);
-    expect(byLabel.get('no matcher for "npm"')!.distinct).toBe(1);
+    expect(byLabel.get('no matcher for "kubectl"')!.distinct).toBe(2);
+    expect(byLabel.get('"git" matcher exists but no rule approves this')!.distinct).toBe(1);
   });
 
   it("returns logFound:false when the log is missing (no crash)", () => {

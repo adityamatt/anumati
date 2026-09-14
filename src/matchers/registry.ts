@@ -58,3 +58,51 @@ export const MATCHERS: MatcherInfo[] = [
 
 /** Just the names, in catalog order. */
 export const MATCHER_NAMES: string[] = MATCHERS.map((m) => m.name);
+
+/**
+ * Leading command → the matcher name(s) that already handle it. Lets a
+ * fall-through be diagnosed precisely: if a command's leading token is owned
+ * here, a matcher FOR it exists, so the reason it was not approved is a missing
+ * or insufficient rule — not a missing matcher. Several names mean the command is
+ * split across matchers by shape (e.g. git read vs write vs push). Names must be
+ * real entries in MATCHERS above.
+ */
+export const LEAD_TO_MATCHERS: Record<string, string[]> = {
+  git: ["git-read", "git-write", "git-push"],
+  node: ["nodejs-pipe", "node-script"],
+  python: ["python3-pipe", "test-runner"],
+  python3: ["python3-pipe", "test-runner"],
+  pip: ["pip3-install"],
+  pip3: ["pip3-install"],
+  npm: ["npm-script"],
+  pnpm: ["npm-script"],
+  yarn: ["npm-script"],
+  curl: ["curl"],
+  gh: ["gh", "gh-pr"],
+  cargo: ["cargo"],
+  go: ["go"],
+  sed: ["sed"],
+  jq: ["jq"],
+  aws: ["aws"],
+  vitest: ["vitest"],
+  eslint: ["eslint"],
+  prettier: ["prettier"],
+  tsc: ["npx-tsc"],
+  npx: ["npx-tsc", "vitest"],
+  cd: ["cd"],
+  sleep: ["sleep"],
+  echo: ["echo"],
+  mkdir: ["mkdir"],
+  docker: ["docker-read"],
+  pytest: ["test-runner"],
+  jest: ["test-runner"],
+  ls: ["safe-inspect"],
+  cat: ["safe-inspect"],
+  head: ["safe-inspect"],
+  tail: ["safe-inspect"],
+  grep: ["safe-inspect"],
+  rg: ["safe-inspect"],
+  find: ["safe-inspect"],
+  stat: ["safe-inspect"],
+  wc: ["safe-inspect"],
+};

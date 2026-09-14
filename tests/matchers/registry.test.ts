@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { MATCHERS, MATCHER_NAMES } from "../../src/matchers/registry.js";
+import { MATCHERS, MATCHER_NAMES, LEAD_TO_MATCHERS } from "../../src/matchers/registry.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const indexSrc = readFileSync(join(here, "../../src/matchers/index.ts"), "utf-8");
@@ -33,5 +33,17 @@ describe("matcher registry", () => {
   it("matches the matchNamed() switch cases exactly", () => {
     const cases = switchCases();
     expect([...cases].sort()).toEqual([...MATCHER_NAMES].sort());
+  });
+
+  // Every matcher named in the lead→matcher map must be a real matcher, or the
+  // fall-through diagnosis would point users at a nonexistent `anumati add <x>`.
+  it("LEAD_TO_MATCHERS only references real matcher names", () => {
+    const known = new Set(MATCHER_NAMES);
+    for (const [lead, owners] of Object.entries(LEAD_TO_MATCHERS)) {
+      expect(owners.length, `lead "${lead}" has no owners`).toBeGreaterThan(0);
+      for (const m of owners) {
+        expect(known.has(m), `lead "${lead}" → unknown matcher "${m}"`).toBe(true);
+      }
+    }
   });
 });

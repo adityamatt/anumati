@@ -3,6 +3,7 @@ import { parseCompound, tokenize } from "./parser/shell.js";
 import { hasUnsafeRedirection } from "./parser/redirect.js";
 import { classify } from "./classifiers/index.js";
 import { evaluate, decomposeSequential } from "./matcher.js";
+import { LEAD_TO_MATCHERS } from "./matchers/registry.js";
 
 /**
  * Stable, enumerable reason codes for why a command was not auto-approved.
@@ -14,7 +15,8 @@ export type PassthroughCode =
   | "unparseable" // could not be parsed (e.g. unclosed quote)
   | "file_redirection" // redirect that writes/reads a file
   | "dangerous_command" // interpreter/shell/privileged leading command
-  | "no_matcher" // a (sub-)command no configured rule covers
+  | "no_matcher" // no matcher exists for this leading command at all
+  | "matcher_not_configured" // a matcher for it EXISTS, but no enabled rule approved this form
   | "unknown"; // fell through for a reason we could not pin down
 
 export interface DebugNote {
@@ -31,8 +33,10 @@ export interface DebugNote {
 const SUBSTITUTION_RE = /[`$]/;
 
 // Diagnose a SINGLE command (composable operators &&/;/||/& have already been
-// split out by debugDiagnose before this is called).
-function diagnoseSingle(cmd: string): DebugNote {
+// split out by debugDiagnose before this is called). `allRules` lets the
+// no-matcher branch tell "no matcher exists" apart from "a matcher exists but no
+// rule is configured/enabled to approve this form".
+function diagnoseSingle(cmd: string, allRules: Rule[] = []): DebugNote {
   if (SUBSTITUTION_RE.test(cmd)) {
     return {
       code: "shell_substitution",
@@ -70,6 +74,22 @@ function diagnoseSingle(cmd: string): DebugNote {
   }
 
   if (head) {
+    const owners = LEAD_TO_MATCHERS[head];
+    if (owners && owners.length > 0) {
+      // A matcher for this command EXISTS — the block is missing/insufficient
+      // config, not a missing matcher. We don't guess which owner is the fix (a
+      // family like git splits read/write/push across matchers), so name them all
+      // and let the user pick; the shape may also be intentionally unapprovable.
+      const fixHint =
+        owners.length === 1
+          ? `\`anumati add ${owners[0]} …\``
+          : `the matching one of: ${owners.join(", ")}`;
+      return {
+        code: "matcher_not_configured",
+        reason: `A matcher for "${head}" exists (${owners.join(", ")}) but no enabled rule approved this command — its allowlist may not cover this form, or the form is intentionally blocked (e.g. a destructive/network/write shape).`,
+        hint: `If this command is safe in your workflow, enable or extend ${fixHint} (see AGENT.md for its options).`,
+      };
+    }
     return {
       code: "no_matcher",
       reason: `No matcher covers "${head}".`,
@@ -98,12 +118,12 @@ export function debugDiagnose(input: HookInput, allRules: Rule[] = []): DebugNot
     for (const sub of subs) {
       const subInput: HookInput = { ...input, tool_input: { ...input.tool_input, command: sub } };
       if (evaluate(subInput, allRules).decision !== "allow") {
-        return { ...diagnoseSingle(sub), offending: sub };
+        return { ...diagnoseSingle(sub, allRules), offending: sub };
       }
     }
   }
 
-  return diagnoseSingle(cmd);
+  return diagnoseSingle(cmd, allRules);
 }
 
 /** Render a DebugNote for display, mirroring the 💡 suggestion format. */
