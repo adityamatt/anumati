@@ -39,6 +39,7 @@ export function configDeltaToAddOptions(
     modules: asStrings(d.allowed_modules),
     packages: asStrings(d.allowed_packages),
     scripts: asStrings(d.allowed_scripts),
+    exec: asStrings(d.allowed_exec),
     repos: asStrings(d.allowed_repos),
     paths: asStrings(open?.allowed_paths),
   };

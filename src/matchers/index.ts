@@ -28,7 +28,12 @@ import { matchNodeScript } from "./node-script.js";
 import { matchMkdir } from "./mkdir.js";
 import { matchDockerRead } from "./docker-read.js";
 
-export function matchNamed(matcher: string, input: HookInput, rule: Rule): boolean {
+export function matchNamed(
+  matcher: string,
+  input: HookInput,
+  rule: Rule,
+  isAllowed?: (command: string) => boolean,
+): boolean {
   const cmd = input.tool_input.command ?? "";
 
   switch (matcher) {
@@ -41,7 +46,7 @@ export function matchNamed(matcher: string, input: HookInput, rule: Rule): boole
     case "safe-inspect": return matchSafeInspect(cmd);
     case "git-read":     return matchGitRead(cmd);
     case "git-write":    return matchGitWrite(cmd, rule.allowed_git_ops ?? []);
-    case "npm-script":   return matchNpmScript(cmd, rule.allowed_scripts ?? []);
+    case "npm-script":   return matchNpmScript(cmd, rule.allowed_scripts ?? [], rule.allowed_exec ?? [], isAllowed);
     case "cargo":        return matchCargo(cmd);
     case "go":           return matchGo(cmd);
     case "cd":           return matchCd(cmd, input.cwd ?? "", rule.open?.allowed_paths ?? []);

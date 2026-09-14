@@ -275,3 +275,26 @@ describe("suggest — Read tool is out of scope", () => {
     expect(suggest(readInput, [])).toBeNull();
   });
 });
+
+describe("suggest — npm-script exec near-miss", () => {
+  const NPM: Rule = { tool: "Bash", matcher: "npm-script", allowed_scripts: ["*"] };
+  const VITEST: Rule = { tool: "Bash", matcher: "vitest" };
+
+  it("suggests --exec <bin> when the delegated tail is already approvable", () => {
+    const s = suggest(bash("pnpm exec vitest run"), [NPM, VITEST]);
+    expect(s).not.toBeNull();
+    expect(s!.matcher).toBe("npm-script");
+    expect(s!.command).toBe("anumati add npm-script --exec vitest");
+    expect(s!.configDelta).toEqual({ allowed_exec: ["vitest"] });
+  });
+
+  it("does NOT suggest exec when the tail is not approvable (no matcher for it)", () => {
+    // tsx has no matcher → adding --exec tsx wouldn't help, so no suggestion.
+    expect(suggest(bash("pnpm exec tsx probe.ts"), [NPM, VITEST])).toBeNull();
+  });
+
+  it("does NOT suggest exec once the binary is already in allowed_exec", () => {
+    const covered: Rule = { ...NPM, allowed_exec: ["vitest"] };
+    expect(suggest(bash("pnpm exec vitest run"), [covered, VITEST])).toBeNull();
+  });
+});

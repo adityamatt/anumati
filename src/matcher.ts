@@ -2,7 +2,11 @@ import type { Rule, HookInput, MatchResult } from "./types.js";
 import { matchNamed } from "./matchers/index.js";
 import { parseCompound } from "./parser/shell.js";
 
-function ruleMatches(rule: Rule, input: HookInput): boolean {
+function ruleMatches(
+  rule: Rule,
+  input: HookInput,
+  isAllowed?: (command: string) => boolean,
+): boolean {
   // A disabled placeholder (e.g. one written by `anumati scaffold`) never
   // matches anything — it exists only to advertise that the matcher is
   // available, not to approve. Skip it before any matcher logic runs.
@@ -11,7 +15,7 @@ function ruleMatches(rule: Rule, input: HookInput): boolean {
   if (rule.tool && rule.tool !== input.tool_name) return false;
 
   if (rule.matcher) {
-    return matchNamed(rule.matcher, input, rule);
+    return matchNamed(rule.matcher, input, rule, isAllowed);
   }
 
   if (rule.subagent_type && input.tool_input.subagent_type !== rule.subagent_type) return false;
@@ -21,8 +25,15 @@ function ruleMatches(rule: Rule, input: HookInput): boolean {
 
 // First rule that accepts the whole input, or null.
 function firstMatchingRule(input: HookInput, allowRules: Rule[]): Rule | null {
+  // A matcher may need to ask "is this OTHER command independently approved?" —
+  // e.g. `pnpm exec <tail>`, which grants nothing beyond running <tail> directly.
+  // Hand it a ruleset-bound evaluator. Recursion terminates because every such
+  // delegation strips a prefix, so the delegated command is strictly shorter.
+  const isAllowed = (command: string): boolean =>
+    evaluate({ ...input, tool_input: { ...input.tool_input, command } }, allowRules).decision ===
+    "allow";
   for (const rule of allowRules) {
-    if (ruleMatches(rule, input)) return rule;
+    if (ruleMatches(rule, input, isAllowed)) return rule;
   }
   return null;
 }

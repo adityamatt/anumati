@@ -16,7 +16,8 @@ import { matchCurl } from "./matchers/curl.js";
 import { matchPython3Pipe } from "./matchers/python3-pipe.js";
 import { matchNodejsPipe } from "./matchers/nodejs-pipe.js";
 import { matchPip3Install } from "./matchers/pip3-install.js";
-import { matchNpmScript } from "./matchers/npm-script.js";
+import { matchNpmScript, skipSelectorFlags, npmExecInfo } from "./matchers/npm-script.js";
+import { evaluate } from "./matcher.js";
 import { matchGh } from "./matchers/gh.js";
 import { matchCargo } from "./matchers/cargo.js";
 import { matchGo } from "./matchers/go.js";
@@ -96,7 +97,7 @@ function findNearMiss(
         miss = nearMissPip3(cmd, rule);
         break;
       case "npm-script":
-        miss = nearMissNpmScript(cmd, rule);
+        miss = nearMissNpmScript(cmd, rule) ?? nearMissNpmScriptExec(cmd, rule, allRules, cwd);
         break;
       case "gh":
         miss = nearMissGh(cmd, rule);
@@ -190,6 +191,30 @@ function nearMissNpmScript(cmd: string, rule: Rule): Suggestion | null {
   if (!matchNpmScript(cmd, candidate)) return null;
 
   return npmScriptSuggestion(missing, cmd);
+}
+
+// A `<pm> exec <bin> …` launcher whose <bin> is not yet opted into allowed_exec.
+// Suggest adding it — but only when the delegated tail is ALREADY independently
+// approved by the ruleset, so `--exec <bin>` would actually flip it to allow (no
+// point suggesting exec for `pnpm exec tsx x.ts`, which stays blocked regardless).
+function nearMissNpmScriptExec(
+  cmd: string,
+  rule: Rule,
+  allRules: Rule[],
+  cwd: string,
+): Suggestion | null {
+  const exec = npmExecInfo(cmd);
+  if (!exec) return null;
+  const allowed = rule.allowed_exec ?? [];
+  if (allowed.includes("*") || allowed.includes(exec.bin)) return null; // already eligible
+  const tailInput: HookInput = {
+    session_id: "suggest",
+    tool_name: "Bash",
+    tool_input: { command: exec.tail },
+    cwd,
+  };
+  if (evaluate(tailInput, allRules).decision !== "allow") return null;
+  return npmExecSuggestion(exec.bin, cmd);
 }
 
 function nearMissGh(cmd: string, rule: Rule): Suggestion | null {
@@ -395,6 +420,16 @@ function npmScriptSuggestion(scripts: string[], cmd: string): Suggestion {
   };
 }
 
+function npmExecSuggestion(bin: string, cmd: string): Suggestion {
+  return {
+    command: `anumati add npm-script --exec ${bin}`,
+    description: `Auto-approve \`pnpm exec ${bin} …\` (reroutes to the ruleset)`,
+    matcher: "npm-script",
+    configDelta: { allowed_exec: [bin] },
+    trigger: cmd,
+  };
+}
+
 function python3Suggestion(
   imports: string[],
   paths: string[],
@@ -567,14 +602,18 @@ function npmScripts(cmd: string): string[] {
     if (!argv) continue;
     const pm = argv[0];
     if (!NPM_PMS.has(pm)) continue;
-    const sub = argv[1];
+    // Skip workspace/dir selector flags so `pnpm -C dir build` yields "build".
+    const subIdx = skipSelectorFlags(argv, 1);
+    if (subIdx < 0) continue;
+    const rest = argv.slice(subIdx); // [sub, …]
+    const sub = rest[0];
     if (!sub) continue;
     if (NPM_READONLY.has(sub)) continue; // read-only query, no script needed
     if (sub === "run") {
-      if (argv[2]) scripts.push(argv[2]);
+      if (rest[1]) scripts.push(rest[1]);
     } else if (sub === "test") {
       scripts.push("test");
-    } else if ((pm === "yarn" || pm === "pnpm") && argv.length === 2) {
+    } else if ((pm === "yarn" || pm === "pnpm") && rest.length === 1) {
       scripts.push(sub);
     }
   }

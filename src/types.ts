@@ -29,6 +29,15 @@ export interface Rule {
   allowed_packages?: string[];
   allowed_scripts?: string[];
   /**
+   * Binaries the `npm-script` matcher may reroute a `<pm> exec <bin> …` launcher
+   * to (e.g. ["vitest","tsc"]). `exec` runs a program from node_modules/.bin, so
+   * rather than trust it blanket, only listed binaries are delegated — and even
+   * then the delegated tail must be independently approved by the ruleset (so a
+   * listed `tsx`/`sed` still can't run an unsafe form). "*" reroutes any binary
+   * (still ruleset-gated); empty/unset reroutes none (every `<pm> exec` prompts).
+   */
+  allowed_exec?: string[];
+  /**
    * Git write subcommands the `git-write` matcher may allow, e.g.
    * ["add","commit","branch","checkout"]. Only non-destructive, local ops can
    * be enabled — network ops (push/pull/fetch) and destructive/history-rewriting

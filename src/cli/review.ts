@@ -96,6 +96,7 @@ const ARRAY_DELTA_KEYS = [
   "allowed_modules",
   "allowed_packages",
   "allowed_scripts",
+  "allowed_exec",
   "allowed_repos",
 ] as const;
 
@@ -382,6 +383,7 @@ function additionPairs(opts: AddOptions): Array<[string, string[]]> {
   add("modules", opts.modules);
   add("packages", opts.packages);
   add("scripts", opts.scripts);
+  add("exec", opts.exec);
   add("repos", opts.repos);
   add("paths", opts.paths);
   return out;
@@ -398,6 +400,7 @@ function addCommand(opts: AddOptions): string {
   flag("--modules", opts.modules);
   flag("--packages", opts.packages);
   flag("--scripts", opts.scripts);
+  flag("--exec", opts.exec);
   flag("--repos", opts.repos);
   flag("--paths", opts.paths);
   return parts.join(" ");

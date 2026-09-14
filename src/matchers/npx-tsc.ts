@@ -5,7 +5,12 @@ import { isSafePipeConsumer } from "../parser/pipe.js";
 function isTscSegment(raw: string): boolean {
   if (hasUnsafeRedirection(raw)) return false;
   const argv = tokenize(raw);
-  return !!argv && argv[0] === "npx" && argv[1] === "tsc" && argv.includes("--noEmit");
+  if (!argv || !argv.includes("--noEmit")) return false;
+  // `npx tsc --noEmit`, or a bare `tsc --noEmit` — the latter is what a launcher
+  // like `pnpm exec tsc --noEmit` delegates once its prefix is stripped. Both are
+  // a no-emit type check: read-only, nothing written.
+  if (argv[0] === "npx") return argv[1] === "tsc";
+  return argv[0] === "tsc";
 }
 
 function isCdSegment(raw: string): boolean {

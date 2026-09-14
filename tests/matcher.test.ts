@@ -476,3 +476,55 @@ describe("evaluate — npx vite build / tsc via build-tool + npx-tsc", () => {
     expect(evaluate(bash("npx tsc && npx vite build"), rules).decision).toBeNull();
   });
 });
+
+describe("evaluate — pnpm exec delegation + selectors", () => {
+  const ALLOW_NPM: Rule = { tool: "Bash", matcher: "npm-script", allowed_scripts: ["*"], allowed_exec: ["vitest", "tsc"], desc: "npm scripts" };
+  const ALLOW_VITEST: Rule = { tool: "Bash", matcher: "vitest", desc: "vitest run" };
+  const ALLOW_CD: Rule = { tool: "Bash", matcher: "cd", open: { allowed_paths: ["/foo"] }, desc: "cd" };
+  const ALL = [ALLOW_NPM, ALLOW_VITEST, ALLOW_TSC, ALLOW_CD];
+
+  it("allows pnpm exec vitest run when the tail is approved", () => {
+    expect(evaluate(bash("pnpm exec vitest run"), ALL).decision).toBe("allow");
+  });
+
+  it("allows pnpm exec tsc --noEmit (delegates to the bare-tsc tail)", () => {
+    expect(evaluate(bash("pnpm exec tsc --noEmit"), ALL).decision).toBe("allow");
+  });
+
+  it("allows pnpm --filter x exec vitest run (selector before exec)", () => {
+    expect(evaluate(bash("pnpm --filter @scope/pkg exec vitest run"), ALL).decision).toBe("allow");
+  });
+
+  it("composes cd && pnpm exec vitest run", () => {
+    expect(evaluate(bash("cd /foo && pnpm exec vitest run"), ALL).decision).toBe("allow");
+  });
+
+  it("denies pnpm exec vitest run when no rule approves the tail", () => {
+    // npm-script rule alone (vitest opted in) → delegated `vitest run` unapproved.
+    expect(evaluate(bash("pnpm exec vitest run"), [ALLOW_NPM]).decision).toBeNull();
+  });
+
+  it("denies a binary not opted into allowed_exec, even if its tail is approvable", () => {
+    // allowed_exec lists vitest+tsc but not eslint; a real eslint rule approves the
+    // tail, yet exec must not reroute to it — the exec surface is what's gated.
+    const ALLOW_ESLINT: Rule = { tool: "Bash", matcher: "eslint", desc: "eslint" };
+    expect(evaluate(bash("eslint ."), [ALLOW_ESLINT]).decision).toBe("allow");
+    expect(evaluate(bash("pnpm exec eslint ."), [ALLOW_NPM, ALLOW_ESLINT]).decision).toBeNull();
+  });
+
+  it("denies pnpm exec tsx probe.ts (arbitrary TS, no matcher)", () => {
+    expect(evaluate(bash("pnpm exec tsx probe.ts"), ALL).decision).toBeNull();
+  });
+
+  it("denies pnpm exec sed -i s/a/b/ file (in-place write)", () => {
+    expect(evaluate(bash("pnpm exec sed -i s/a/b/ file"), ALL).decision).toBeNull();
+  });
+
+  it("denies a chained exec smuggling a destructive command", () => {
+    expect(evaluate(bash("pnpm exec vitest run && rm -rf /"), ALL).decision).toBeNull();
+  });
+
+  it("allows a selector-scoped script: pnpm -C apps/api build", () => {
+    expect(evaluate(bash("pnpm -C apps/api build"), ALL).decision).toBe("allow");
+  });
+});

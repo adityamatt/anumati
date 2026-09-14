@@ -279,3 +279,104 @@ describe("matchNpmScript — empty allowlist", () => {
     expect(matchNpmScript("npm outdated", [])).toBe(true);
   });
 });
+
+describe("matchNpmScript — workspace/dir selector flags", () => {
+  it("allows pnpm -C apps/backend typecheck", () => {
+    expect(matchNpmScript("pnpm -C apps/backend typecheck", SCRIPTS)).toBe(true);
+  });
+
+  it("allows pnpm --dir /repo run build", () => {
+    expect(matchNpmScript("pnpm --dir /repo run build", SCRIPTS)).toBe(true);
+  });
+
+  it("allows pnpm --filter @scope/pkg test", () => {
+    expect(matchNpmScript("pnpm --filter @scope/pkg test", SCRIPTS)).toBe(true);
+  });
+
+  it("allows pnpm --filter=@scope/pkg run lint (folded value)", () => {
+    expect(matchNpmScript("pnpm --filter=@scope/pkg run lint", SCRIPTS)).toBe(true);
+  });
+
+  it("allows pnpm -r lint (recursive boolean flag)", () => {
+    expect(matchNpmScript("pnpm -r lint", SCRIPTS)).toBe(true);
+  });
+
+  it("allows multiple selectors: pnpm --filter a --filter b test", () => {
+    expect(matchNpmScript("pnpm --filter a --filter b test", SCRIPTS)).toBe(true);
+  });
+
+  it("still gates the script behind the allowlist despite selectors", () => {
+    expect(matchNpmScript("pnpm --filter x run deploy", SCRIPTS)).toBe(false);
+  });
+
+  it("rejects a selector flag missing its value", () => {
+    expect(matchNpmScript("pnpm --filter", SCRIPTS)).toBe(false);
+  });
+
+  it("still rejects a selector in front of install", () => {
+    expect(matchNpmScript("pnpm -C /repo install", ["*"])).toBe(false);
+  });
+});
+
+describe("matchNpmScript — exec delegation (gated by allowedExec)", () => {
+  // The tail is approved iff isAllowed says so; these stubs stand in for the ruleset.
+  const yes = () => true;
+  const no = () => false;
+
+  it("delegates the tail when the binary is opted in", () => {
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], ["vitest"], yes)).toBe(true);
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], ["vitest"], no)).toBe(false);
+  });
+
+  it("reroutes any binary under a '*' exec list (still tail-gated)", () => {
+    expect(matchNpmScript("pnpm exec biome check", ["*"], ["*"], yes)).toBe(true);
+    expect(matchNpmScript("pnpm exec biome check", ["*"], ["*"], no)).toBe(false);
+  });
+
+  it("does NOT reroute a binary absent from allowedExec, even if the tail is approvable", () => {
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], ["tsc"], yes)).toBe(false);
+  });
+
+  it("reroutes nothing when allowedExec is empty (default)", () => {
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], [], yes)).toBe(false);
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], undefined, yes)).toBe(false);
+  });
+
+  it("passes the exact tail to the evaluator", () => {
+    let seen = "";
+    matchNpmScript("pnpm exec tsc --noEmit", ["*"], ["tsc"], (c) => ((seen = c), true));
+    expect(seen).toBe("tsc --noEmit");
+  });
+
+  it("gates on the binary basename, not a full path", () => {
+    expect(
+      matchNpmScript("pnpm exec ./node_modules/.bin/vitest run", ["*"], ["vitest"], yes),
+    ).toBe(true);
+  });
+
+  it("strips selector flags before exec: pnpm --filter x exec vitest run", () => {
+    let seen = "";
+    matchNpmScript("pnpm --filter x exec vitest run", ["*"], ["vitest"], (c) => ((seen = c), true));
+    expect(seen).toBe("vitest run");
+  });
+
+  it("keeps a trailing pipe with the delegated tail", () => {
+    let seen = "";
+    matchNpmScript("pnpm exec vitest run | tail -5", ["*"], ["vitest"], (c) => ((seen = c), true));
+    expect(seen).toBe("vitest run | tail -5");
+  });
+
+  it("denies exec when no evaluator is supplied", () => {
+    expect(matchNpmScript("pnpm exec vitest run", ["*"], ["*"])).toBe(false);
+  });
+
+  it("does not treat a chain as one exec unit (left to composition)", () => {
+    // `&&` present → not delegated here; whole-command match fails, and even a
+    // yes-evaluator must not approve the chain through this matcher.
+    expect(matchNpmScript("pnpm exec vitest && rm -rf /", ["*"], ["*"], yes)).toBe(false);
+  });
+
+  it("rejects a bare exec with nothing to run", () => {
+    expect(matchNpmScript("pnpm exec", ["*"], ["*"], yes)).toBe(false);
+  });
+});
