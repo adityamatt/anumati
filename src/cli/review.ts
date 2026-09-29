@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
-import { join } from "path";
+import { homedir } from "os";
+import { isAbsolute, join, sep } from "path";
 import { createInterface } from "readline/promises";
 import type { Config, HookInput, Rule } from "../types.js";
 import {
@@ -116,6 +117,71 @@ function mergeDelta(into: Record<string, unknown>, from: Record<string, unknown>
     const current = Array.isArray(intoOpen.allowed_paths) ? intoOpen.allowed_paths : [];
     into.open = { allowed_paths: [...new Set([...current, ...fromPaths])] };
   }
+}
+
+// A consolidated root must be at least this many components deep (e.g.
+// /Users/me/.claude), so merging never widens approval to "/", /Users, or ~.
+const MIN_CONSOLIDATED_DEPTH = 3;
+
+function pathComponents(p: string): string[] {
+  return p.split(sep).filter(Boolean);
+}
+
+function componentsToDir(parts: string[]): string {
+  return sep + parts.join(sep) + sep;
+}
+
+function isUnder(child: string[], parent: string[]): boolean {
+  return parent.length <= child.length && parent.every((c, i) => child[i] === c);
+}
+
+/**
+ * Collapse sibling allowed_paths into their deepest shared ancestor, so review
+ * proposes `/a/b/c/` rather than `/a/b/c/d/` and `/a/b/c/e/`. Merges greedily,
+ * deepest ancestor first, and only into an ancestor that is at least
+ * MIN_CONSOLIDATED_DEPTH deep and is not the home directory (or above it).
+ * Paths already under another listed path are dropped. Relative paths are kept
+ * as-is — they resolve per-cwd, so a shared prefix means nothing.
+ */
+export function consolidatePaths(paths: string[]): string[] {
+  const relative = [...new Set(paths.filter((p) => !isAbsolute(p)))];
+  const home = pathComponents(homedir());
+  const isSafeRoot = (parts: string[]) =>
+    parts.length >= MIN_CONSOLIDATED_DEPTH && !isUnder(home, parts);
+
+  // Keep the original spelling of each absolute path alongside its components.
+  let entries = [...new Set(paths.filter((p) => isAbsolute(p)))].map((raw) => ({
+    raw,
+    parts: pathComponents(raw),
+  }));
+  const dropCovered = () => {
+    entries = entries.filter(
+      (e, i) =>
+        !entries.some(
+          (o, j) => j !== i && isUnder(e.parts, o.parts) && (o.parts.length < e.parts.length || j < i),
+        ),
+    );
+  };
+  dropCovered();
+
+  for (;;) {
+    let best: string[] | null = null;
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i].parts;
+        const b = entries[j].parts;
+        let n = 0;
+        while (n < a.length && n < b.length && a[n] === b[n]) n++;
+        const shared = a.slice(0, n);
+        if (isSafeRoot(shared) && (!best || shared.length > best.length)) best = shared;
+      }
+    }
+    if (!best) break;
+    entries.push({ raw: componentsToDir(best), parts: best });
+    dropCovered();
+  }
+
+  return [...entries.map((e) => e.raw), ...relative];
 }
 
 function ruleStateFor(rules: Rule[], matcher: string): Proposal["ruleState"] {
@@ -270,7 +336,12 @@ export function analyzeReview(opts: ReviewOptions & { rules?: Rule[]; config?: s
     unapprovableByCode.set(key, g);
   }
 
-  // Finalize each proposal's applyable options from its merged delta.
+  // Consolidate sibling paths into a shared root, then finalize each proposal's
+  // applyable options from its merged delta.
+  for (const p of proposalsByMatcher.values()) {
+    const open = p.delta.open as { allowed_paths?: string[] } | undefined;
+    if (open?.allowed_paths) open.allowed_paths = consolidatePaths(open.allowed_paths);
+  }
   const proposals = [...proposalsByMatcher.values()]
     .map((p) => ({ ...p, addOptions: configDeltaToAddOptions(p.matcher, p.delta) }))
     .sort((a, b) => b.occurrences - a.occurrences || b.distinct - a.distinct);

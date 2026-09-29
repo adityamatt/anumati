@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "fs";
-import { tmpdir } from "os";
+import { homedir, tmpdir } from "os";
 import { join } from "path";
-import { analyzeReview, applyProposals, parseReviewArgs } from "../../src/cli/review.js";
+import { analyzeReview, applyProposals, consolidatePaths, parseReviewArgs } from "../../src/cli/review.js";
 import type { Config } from "../../src/types.js";
 
 let dir: string;
@@ -227,5 +227,32 @@ describe("parseReviewArgs", () => {
   it("throws when a value flag is missing its value", () => {
     expect(() => parseReviewArgs(["--log"])).toThrow(/--log requires a value/);
     expect(() => parseReviewArgs(["--config", "--all"])).toThrow(/--config requires a value/);
+  });
+});
+
+describe("consolidatePaths", () => {
+  it("collapses siblings into their deepest shared root", () => {
+    expect(consolidatePaths(["/a/b/c/d/", "/a/b/c/e/"])).toEqual(["/a/b/c/"]);
+  });
+
+  it("merges deepest first and keeps unrelated paths separate", () => {
+    expect(
+      consolidatePaths(["/a/b/c/d/x/", "/a/b/c/d/y/", "/a/b/c/e/", "/p/q/r/s/"]).sort(),
+    ).toEqual(["/a/b/c/", "/p/q/r/s/"]);
+  });
+
+  it("never widens to a shallow root, the home dir, or above it", () => {
+    expect(consolidatePaths(["/a/b/x/", "/a/y/"]).sort()).toEqual(["/a/b/x/", "/a/y/"]);
+    const home = homedir();
+    const inHome = [join(home, "one") + "/", join(home, "two") + "/"];
+    expect(consolidatePaths(inHome).sort()).toEqual(inHome.sort());
+  });
+
+  it("drops paths already covered by another and leaves relative paths alone", () => {
+    expect(consolidatePaths(["/a/b/c/", "/a/b/c/d/", "data/", "logs/"])).toEqual([
+      "/a/b/c/",
+      "data/",
+      "logs/",
+    ]);
   });
 });
